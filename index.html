@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Color Temperature VAS</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600&family=Noto+Sans+JP:wght@400;600&family=Noto+Sans+TC:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  /* Single fixed theme on purpose: the stimulus must render on the same
+     neutral ground for every participant, regardless of OS dark mode. */
+  :root {
+    --ground: #8f8f8f;      /* neutral grey, L* ≈ 60 */
+    --panel: #ececec;
+    --panel-edge: #d6d6d6;
+    --ink: #1b1b1b;
+    --ink-soft: #4a4a4a;
+    --ink-faint: #7a7a7a;
+    --line: #1b1b1b;
+    --focus: #1b1b1b;
+    --sans: "Noto Sans", "Noto Sans JP", "Noto Sans TC", "Hiragino Sans", "Microsoft JhengHei", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+    color-scheme: light;
+  }
+  html[lang="ja"] { --sans: "Noto Sans JP", "Noto Sans", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif; }
+  html[lang="zh-Hant"] { --sans: "Noto Sans TC", "Noto Sans", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif; }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  main {
+    min-height: 100%;
+    display: grid;
+    place-items: center;
+    padding: 32px 20px;
+  }
+  .screen { display: none; width: 100%; }
+  .screen.active { display: block; }
+
+  /* Panels for text screens */
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 36px 40px 32px;
+  }
+  @media (max-width: 520px) { .panel { padding: 28px 22px 24px; } }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 8px;
+  }
+  h1 {
+    font-size: 24px;
+    font-weight: 600;
+    line-height: 1.3;
+    margin: 0 0 20px;
+    text-wrap: balance;
+  }
+  p { margin: 0 0 14px; max-width: 62ch; color: var(--ink-soft); }
+  p.strong { color: var(--ink); }
+  .stack { display: flex; flex-direction: column; gap: 16px; }
+  .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; }
+
+  label.field { display: block; font-size: 14px; color: var(--ink-soft); }
+  label.field span { display: block; margin-bottom: 6px; }
+  input[type="text"] {
+    width: 100%;
+    font: 500 16px var(--mono);
+    padding: 10px 12px;
+    border: 1px solid var(--ink-faint);
+    background: #fff;
+    color: var(--ink);
+    border-radius: 0;
+  }
+  input[type="text"]:focus-visible, button:focus-visible, .vas:focus-visible, .lang button:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+  .check { display: flex; gap: 10px; align-items: flex-start; font-size: 15px; color: var(--ink); cursor: pointer; }
+  .check input { margin-top: 5px; width: 18px; height: 18px; accent-color: var(--ink); flex: none; }
+
+  button {
+    font: 600 15px var(--sans);
+    padding: 11px 22px;
+    border: 1px solid var(--ink);
+    background: var(--ink);
+    color: #fff;
+    cursor: pointer;
+    border-radius: 0;
+  }
+  button.secondary { background: transparent; color: var(--ink); }
+  button:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  /* Language chooser */
+  .lang { display: grid; gap: 10px; margin-top: 8px; }
+  .lang button {
+    display: flex; justify-content: space-between; align-items: baseline;
+    width: 100%; text-align: left;
+    background: #fff; color: var(--ink); border: 1px solid var(--panel-edge);
+    padding: 14px 18px; font-weight: 600; font-size: 17px;
+  }
+  .lang button small { font: 400 12px var(--mono); color: var(--ink-faint); letter-spacing: 0.06em; }
+  .lang button:hover { border-color: var(--ink); }
+
+  /* Trial screen */
+  .trial {
+    display: flex; flex-direction: column; align-items: center; gap: 40px;
+    width: 100%; max-width: 640px; margin: 0 auto;
+  }
+  .counter {
+    font: 500 13px var(--mono);
+    letter-spacing: 0.06em;
+    color: #2b2b2b;
+    font-variant-numeric: tabular-nums;
+    align-self: flex-start;
+    min-height: 20px;
+  }
+  .patch {
+    width: min(58vmin, 380px);
+    height: min(58vmin, 380px);
+    background: var(--ground);
+  }
+  .vas-wrap { width: 100%; max-width: 560px; }
+  .vas {
+    position: relative;
+    height: 56px;
+    cursor: crosshair;
+    touch-action: none;
+    user-select: none;
+  }
+  .vas .line {
+    position: absolute; left: 0; right: 0; top: 50%;
+    height: 2px; background: var(--line); transform: translateY(-50%);
+  }
+  .vas .end {
+    position: absolute; top: 50%; width: 2px; height: 22px;
+    background: var(--line); transform: translate(0, -50%);
+  }
+  .vas .end.l { left: 0; } .vas .end.r { right: 0; }
+  .vas .marker {
+    position: absolute; top: 50%; width: 3px; height: 34px;
+    background: var(--line); transform: translate(-50%, -50%);
+    display: none;
+  }
+  .vas.answered .marker { display: block; }
+  .anchors {
+    display: flex; justify-content: space-between;
+    font-size: 15px; font-weight: 600; color: #1b1b1b;
+    margin-top: 4px;
+  }
+  .trial .actions { justify-content: center; margin-top: 0; }
+
+  /* Demo VAS in instructions is not interactive */
+  .demo .vas { cursor: default; height: 44px; }
+  .demo .vas .marker { display: block; left: 50%; opacity: 0.35; }
+
+  .status { font-family: var(--mono); font-size: 14px; color: var(--ink-soft); }
+  .code {
+    font: 500 22px var(--mono); letter-spacing: 0.12em;
+    background: #fff; border: 1px solid var(--panel-edge);
+    padding: 12px 16px; display: inline-block; margin: 6px 0 14px;
+  }
+  .hidden { display: none !important; }
+  @media (prefers-reduced-motion: no-preference) {
+    .patch { transition: background-color 0s; }
+  }
+</style>
+
+</head>
+<body>
+<main>
+  <!-- 0. Language -->
+  <section class="screen active" id="s-lang">
+    <div class="panel">
+      <p class="eyebrow">Kyushu University · Haptics Lab</p>
+      <h1>言語を選んでください / Choose a language / 請選擇語言</h1>
+      <div class="lang">
+        <button type="button" data-lang="ja">日本語 <small>JA</small></button>
+        <button type="button" data-lang="en">English <small>EN</small></button>
+        <button type="button" data-lang="zh-Hant">繁體中文 <small>ZH-TW</small></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 1. Consent + ID -->
+  <section class="screen" id="s-consent">
+    <div class="panel">
+      <p class="eyebrow" data-i18n="eyebrow"></p>
+      <h1 data-i18n="title"></h1>
+      <p data-i18n="consent1"></p>
+      <p data-i18n="consent2"></p>
+      <div class="stack" style="margin-top:22px">
+        <label class="field">
+          <span data-i18n="pidLabel"></span>
+          <input type="text" id="pid" autocomplete="off" spellcheck="false" maxlength="40">
+        </label>
+        <label class="check">
+          <input type="checkbox" id="consent">
+          <span data-i18n="consentCheck"></span>
+        </label>
+      </div>
+      <div class="actions">
+        <button type="button" id="btn-consent" disabled data-i18n="next"></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. Screen setup -->
+  <section class="screen" id="s-screen">
+    <div class="panel">
+      <p class="eyebrow" data-i18n="eyebrow"></p>
+      <h1 data-i18n="screenTitle"></h1>
+      <p data-i18n="screen1"></p>
+      <p data-i18n="screen2"></p>
+      <p data-i18n="screen3"></p>
+      <div class="actions">
+        <button type="button" class="secondary" id="btn-fs" data-i18n="fullscreen"></button>
+        <button type="button" id="btn-screen" data-i18n="next"></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. Instructions -->
+  <section class="screen" id="s-instr">
+    <div class="panel">
+      <p class="eyebrow" data-i18n="eyebrow"></p>
+      <h1 data-i18n="instrTitle"></h1>
+      <p data-i18n="instr1"></p>
+      <p data-i18n="instr2"></p>
+      <div class="demo vas-wrap" style="margin:18px 0 6px">
+        <div class="vas"><div class="line"></div><div class="end l"></div><div class="end r"></div><div class="marker"></div></div>
+        <div class="anchors"><span data-i18n="cold"></span><span data-i18n="hot"></span></div>
+      </div>
+      <p data-i18n="instr3"></p>
+      <div class="actions">
+        <button type="button" id="btn-start" data-i18n="startPractice"></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. Trial -->
+  <section class="screen" id="s-trial">
+    <div class="trial">
+      <div class="counter" id="counter"></div>
+      <div class="patch" id="patch"></div>
+      <div class="vas-wrap">
+        <div class="vas" id="vas" tabindex="0" role="slider" aria-valuemin="0" aria-valuemax="100">
+          <div class="line"></div><div class="end l"></div><div class="end r"></div><div class="marker" id="marker"></div>
+        </div>
+        <div class="anchors"><span data-i18n="cold"></span><span data-i18n="hot"></span></div>
+      </div>
+      <div class="actions">
+        <button type="button" id="btn-next" disabled data-i18n="next"></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4b. Between practice and main -->
+  <section class="screen" id="s-main-intro">
+    <div class="panel">
+      <p class="eyebrow" data-i18n="eyebrow"></p>
+      <h1 data-i18n="mainTitle"></h1>
+      <p data-i18n="main1"></p>
+      <div class="actions">
+        <button type="button" id="btn-main" data-i18n="startMain"></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. Done -->
+  <section class="screen" id="s-done">
+    <div class="panel">
+      <p class="eyebrow" data-i18n="eyebrow"></p>
+      <h1 data-i18n="doneTitle"></h1>
+      <p class="status" id="send-status"></p>
+      <div class="row" style="gap:28px;align-items:flex-start">
+        <div>
+          <p data-i18n="subjectLabel" style="margin-bottom:2px"></p>
+          <div class="code" id="subject"></div>
+        </div>
+        <div>
+          <p data-i18n="codeLabel" style="margin-bottom:2px"></p>
+          <div class="code" id="code"></div>
+        </div>
+      </div>
+      <p data-i18n="done1"></p>
+      <div class="actions" style="justify-content:flex-start">
+        <button type="button" class="secondary" id="btn-csv" data-i18n="download"></button>
+        <button type="button" class="secondary" id="btn-restart" data-i18n="restart"></button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ============================================================
+   CONFIG — edit this block only
+   ============================================================ */
+const CONFIG = {
+  STUDY_ID: "color-temp-vas-v1",
+  // Google Apps Script web-app URL (see README). Leave "" to disable
+  // online submission; participants then download a CSV at the end.
+  ENDPOINT_URL: "https://script.google.com/macros/s/AKfycbwJBoZtpLC3x5DjGq-Mh9Wm6K4qTm_VjZJiABAtCNuQKPFgq2al6TyP5zs-kFCVg23V/exec",
+  REPS: 1,                 // repetitions of each color (1 = each color shown once)
+  ISI_MS: 500,             // blank grey between trials
+  TRIAL_TIMEOUT_MS: 60000, // trial auto-advances after this; 0 = no limit
+  PRACTICE_COLORS: [       // shown once before the main block, flagged practice=1
+    { name: "practice-grey", hue: null, L: 70, C: 0, rgb: [171, 171, 171] }
+  ],
+  // 12 CIELCh hues, constant L* = 70, maximum in-gamut chroma per hue
+  COLORS: [
+    { name: "h040", hue: 40,  L: 70, C: 104.6, rgb: [255, 0, 0] },
+    { name: "h070", hue: 70,  L: 70, C: 97.5,  rgb: [255, 184, 0] },
+    { name: "h100", hue: 100, L: 70, C: 104.0, rgb: [132, 255, 0] },
+    { name: "h130", hue: 130, L: 70, C: 91.7,  rgb: [0, 255, 84] },
+    { name: "h160", hue: 160, L: 70, C: 84.0,  rgb: [0, 255, 184] },
+    { name: "h190", hue: 190, L: 70, C: 80.7,  rgb: [0, 228, 255] },
+    { name: "h220", hue: 220, L: 70, C: 92.8,  rgb: [0, 140, 255] },
+    { name: "h250", hue: 250, L: 70, C: 97.6,  rgb: [0, 60, 255] },
+    { name: "h280", hue: 280, L: 70, C: 93.1,  rgb: [136, 0, 255] },
+    { name: "h310", hue: 310, L: 70, C: 90.5,  rgb: [255, 0, 184] },
+    { name: "h340", hue: 340, L: 70, C: 87.1,  rgb: [255, 0, 88] },
+    { name: "h010", hue: 10,  L: 70, C: 99.4,  rgb: [255, 48, 0] }
+  ]
+};
+
+/* ============================================================
+   Strings
+   ============================================================ */
+const I18N = {
+  ja: {
+    eyebrow: "九州大学 ・ ハプティクス研究室",
+    title: "色と温度の印象に関する調査",
+    consent1: "本調査は、色から受ける温度の印象を調べる研究の一環として行われます。所要時間は約5分です。画面に表示される色を見て、その色から感じる温度を線の上で答えていただきます。",
+    consent2: "回答は匿名で扱われ、研究目的にのみ使用されます。参加は任意であり、いつでもブラウザを閉じて中止できます。",
+    pidLabel: "参加者ID（配布されたIDがある場合は入力してください）",
+    consentCheck: "上記の説明を読み、調査への参加に同意します。",
+    screenTitle: "画面の準備",
+    screen1: "画面の明るさを普段お使いの状態にしてください。",
+    screen2: "Night Shift・夜間モード・ブルーライトカットなどの色温度を変える機能、およびダークモードや画面フィルターはオフにしてください。",
+    screen3: "できるだけ周囲の照明が一定の場所で、正面から画面を見て回答してください。",
+    fullscreen: "全画面表示にする",
+    instrTitle: "回答のしかた",
+    instr1: "画面の中央に色が表示されます。その色から感じる温度の印象を、下の線の上をクリック（タップ）して答えてください。",
+    instr2: "左端が「とても冷たい」、右端が「とても熱い」です。線上のどこでも自由に選べ、選んだ後にドラッグして調整できます。",
+    instr3: "正解はありません。あまり考え込まず、直感でお答えください。まず練習を1回行います。",
+    cold: "とても冷たい",
+    hot: "とても熱い",
+    startPractice: "練習を始める",
+    mainTitle: "本番を始めます",
+    main1: "練習は終了です。ここからの回答が記録されます。全部で {n} 試行あります。",
+    startMain: "本番を始める",
+    next: "次へ",
+    counter: "{i} / {n}",
+    practice: "練習",
+    doneTitle: "ご協力ありがとうございました",
+    sending: "回答を送信しています…",
+    sent: "回答が送信されました。このページを閉じて構いません。",
+    sentUnconfirmed: "回答を送信しました（受信の確認はできませんでした）。念のため下のボタンからデータを保存しておいてください。",
+    failed: "送信に失敗しました。下のボタンからデータをダウンロードし、研究者にお送りください。",
+    offline: "オンライン送信は設定されていません。下のボタンからデータをダウンロードし、研究者にお送りください。",
+    codeLabel: "完了コード",
+    subjectLabel: "被験者コード",
+    preparing: "準備中…",
+    partial: "一部のデータの送信に失敗しました。下のボタンからデータをダウンロードし、研究者にお送りください。",
+    done1: "",
+    download: "データをダウンロード（CSV）",
+    restart: "次の参加者を開始"
+  },
+  en: {
+    eyebrow: "Kyushu University · Haptics Lab",
+    title: "Color and Temperature Impression Survey",
+    consent1: "This survey is part of a study on the temperature impressions evoked by colors. It takes about 5 minutes. You will see a color on the screen and indicate, on a line, how warm or cold it feels to you.",
+    consent2: "Responses are anonymous and used only for research. Participation is voluntary; you may stop at any time by closing the browser.",
+    pidLabel: "Participant ID (enter the ID you were given, if any)",
+    consentCheck: "I have read the information above and agree to take part.",
+    screenTitle: "Screen setup",
+    screen1: "Set your screen brightness to the level you normally use.",
+    screen2: "Turn off Night Shift, night mode, blue-light filters, and any dark mode or screen filter that changes colors.",
+    screen3: "If possible, sit in steady lighting and look at the screen straight on.",
+    fullscreen: "Enter full screen",
+    instrTitle: "How to respond",
+    instr1: "A color will appear in the middle of the screen. Click (or tap) on the line below it to indicate the temperature impression you get from that color.",
+    instr2: "The left end means “very cold” and the right end means “very hot”. You can choose any point on the line and drag to adjust after clicking.",
+    instr3: "There are no right or wrong answers. Go with your first impression. We will start with one practice trial.",
+    cold: "Very cold",
+    hot: "Very hot",
+    startPractice: "Start practice",
+    mainTitle: "Main session",
+    main1: "Practice is complete. From here on your responses are recorded. There are {n} trials in total.",
+    startMain: "Start",
+    next: "Next",
+    counter: "{i} / {n}",
+    practice: "Practice",
+    doneTitle: "Thank you for taking part",
+    sending: "Sending your responses…",
+    sent: "Your responses were received. You may close this page.",
+    sentUnconfirmed: "Your responses were sent, but receipt could not be confirmed. Please also save a copy with the button below.",
+    failed: "Sending failed. Please download your data with the button below and send it to the researcher.",
+    offline: "Online submission is not configured. Please download your data with the button below and send it to the researcher.",
+    codeLabel: "Completion code",
+    subjectLabel: "Subject code",
+    preparing: "Preparing…",
+    partial: "Some responses could not be sent. Please download your data with the button below and send it to the researcher.",
+    done1: "",
+    download: "Download data (CSV)",
+    restart: "New participant"
+  },
+  "zh-Hant": {
+    eyebrow: "九州大學 ・ 觸覺研究室",
+    title: "顏色與溫度印象調查",
+    consent1: "本調查為探討顏色所引發之溫度印象的研究之一部分，全程約需5分鐘。畫面上會顯示一種顏色，請在線段上標示您覺得它有多冷或多熱。",
+    consent2: "您的回答將以匿名方式處理，僅用於研究目的。參與完全自願，您可隨時關閉瀏覽器中止作答。",
+    pidLabel: "參與者編號（若您有收到編號，請在此輸入）",
+    consentCheck: "我已閱讀上述說明，並同意參與本調查。",
+    screenTitle: "螢幕設定",
+    screen1: "請將螢幕亮度調整為您平常使用的狀態。",
+    screen2: "請關閉夜覽（Night Shift）、夜間模式、濾藍光，以及深色模式等會改變顏色的螢幕濾鏡。",
+    screen3: "請盡量在光線穩定的環境中，正面注視螢幕作答。",
+    fullscreen: "進入全螢幕",
+    instrTitle: "作答方式",
+    instr1: "畫面中央會顯示一種顏色。請點擊（或輕觸）下方線段上的位置，表示這個顏色帶給您的溫度感受。",
+    instr2: "最左端代表「非常冷」，最右端代表「非常熱」。您可以選擇線段上任何一點，點選後也可拖曳調整。",
+    instr3: "沒有正確答案，請憑第一印象作答。我們先進行一次練習。",
+    cold: "非常冷",
+    hot: "非常熱",
+    startPractice: "開始練習",
+    mainTitle: "正式作答",
+    main1: "練習結束。接下來的回答將會被記錄。總共有 {n} 題。",
+    startMain: "開始",
+    next: "下一題",
+    counter: "{i} / {n}",
+    practice: "練習",
+    doneTitle: "感謝您的參與",
+    sending: "正在傳送您的回答…",
+    sent: "您的回答已成功送出，可以關閉此頁面。",
+    sentUnconfirmed: "回答已送出，但無法確認是否收到。請同時使用下方按鈕儲存一份資料。",
+    failed: "傳送失敗。請使用下方按鈕下載資料，並寄給研究人員。",
+    offline: "尚未設定線上傳送。請使用下方按鈕下載資料，並寄給研究人員。",
+    codeLabel: "完成代碼",
+    subjectLabel: "受試者代碼",
+    preparing: "準備中…",
+    partial: "部分資料傳送失敗。請使用下方按鈕下載資料，並寄給研究人員。",
+    done1: "",
+    download: "下載資料（CSV）",
+    restart: "下一位參與者"
+  }
+};
+
+/* ============================================================
+   State
+   ============================================================ */
+const $ = (id) => document.getElementById(id);
+let lang = "en";
+let T = I18N.en;
+const session = {
+  id: makeId(),
+  subject: "",       // assigned by the sheet at registration (S001, S002, …)
+  pid: "",
+  startedAt: new Date().toISOString(),
+  device: null,
+  rows: []
+};
+let trials = [];       // sequence of {color, practice, rep}
+let idx = 0;
+let cur = null;        // current trial timing/response
+let mainStarted = false;
+const pending = [];    // in-flight trial uploads
+let sendFailures = 0;
+let trialTimer = null;
+
+function makeId() {
+  const a = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let s = "";
+  const buf = new Uint8Array(8);
+  (window.crypto || {}).getRandomValues ? crypto.getRandomValues(buf) : buf.forEach((_, i) => buf[i] = Math.random() * 256);
+  for (const b of buf) s += a[b % a.length];
+  return s;
+}
+function hex([r, g, b]) { return "#" + [r, g, b].map(v => v.toString(16).padStart(2, "0")).join(""); }
+function fmt(s, vars) { return s.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? ""); }
+
+/* ---------- i18n ---------- */
+function applyLang(code) {
+  lang = code;
+  T = I18N[code];
+  document.documentElement.lang = code === "zh-Hant" ? "zh-Hant" : code;
+  document.querySelectorAll("[data-i18n]").forEach(el => {
+    const key = el.dataset.i18n;
+    if (key in T) el.textContent = T[key];
+  });
+  $("btn-fs").classList.toggle("hidden", !document.documentElement.requestFullscreen);
+}
+
+/* ---------- navigation ---------- */
+function show(id) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.toggle("active", s.id === id));
+  window.scrollTo(0, 0);
+}
+
+/* ---------- sequence ---------- */
+function buildSequence() {
+  const seq = [];
+  CONFIG.PRACTICE_COLORS.forEach(c => seq.push({ color: c, practice: 1, rep: 0 }));
+  let prev = null;
+  for (let r = 1; r <= CONFIG.REPS; r++) {
+    let block;
+    do {
+      block = shuffle(CONFIG.COLORS.slice());
+    } while (prev && block[0].name === prev.name && CONFIG.COLORS.length > 1);
+    block.forEach(c => seq.push({ color: c, practice: 0, rep: r }));
+    prev = block[block.length - 1];
+  }
+  return seq;
+}
+function shuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/* ---------- device info ---------- */
+function deviceInfo() {
+  const mm = (q) => (window.matchMedia && window.matchMedia(q).matches) ? 1 : 0;
+  return {
+    screen_w: screen.width, screen_h: screen.height,
+    viewport_w: window.innerWidth, viewport_h: window.innerHeight,
+    dpr: window.devicePixelRatio || 1,
+    color_depth: screen.colorDepth,
+    gamut_p3: mm("(color-gamut: p3)"),
+    prefers_dark: mm("(prefers-color-scheme: dark)"),
+    touch: ("ontouchstart" in window) ? 1 : 0,
+    user_agent: navigator.userAgent,
+    tz: (Intl.DateTimeFormat().resolvedOptions().timeZone) || ""
+  };
+}
+
+/* ---------- VAS ---------- */
+const vas = $("vas"), marker = $("marker"), patch = $("patch");
+let dragging = false;
+function setVas(clientX) {
+  const rect = vas.getBoundingClientRect();
+  let v = (clientX - rect.left) / rect.width * 100;
+  v = Math.max(0, Math.min(100, v));
+  cur.vas = Math.round(v * 10) / 10;
+  if (cur.rtFirst == null) cur.rtFirst = Math.round(performance.now() - cur.onset);
+  cur.nClicks++;
+  marker.style.left = v + "%";
+  vas.classList.add("answered");
+  vas.setAttribute("aria-valuenow", cur.vas);
+  $("btn-next").disabled = false;
+}
+vas.addEventListener("pointerdown", (e) => {
+  if (!cur) return;
+  dragging = true;
+  vas.setPointerCapture(e.pointerId);
+  setVas(e.clientX);
+});
+vas.addEventListener("pointermove", (e) => { if (dragging) setVas(e.clientX); });
+vas.addEventListener("pointerup", () => { dragging = false; });
+vas.addEventListener("pointercancel", () => { dragging = false; });
+vas.addEventListener("keydown", (e) => {
+  if (!cur || cur.vas == null) return;
+  const step = e.shiftKey ? 5 : 1;
+  if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+    e.preventDefault();
+    const rect = vas.getBoundingClientRect();
+    const v = cur.vas + (e.key === "ArrowLeft" ? -step : step);
+    setVas(rect.left + Math.max(0, Math.min(100, v)) / 100 * rect.width);
+  }
+});
+
+/* ---------- trials ---------- */
+function startTrial() {
+  const t = trials[idx];
+  const mainTotal = trials.filter(x => !x.practice).length;
+  const mainIndex = trials.slice(0, idx + 1).filter(x => !x.practice).length;
+  $("counter").textContent = t.practice ? T.practice : fmt(T.counter, { i: mainIndex, n: mainTotal });
+  vas.classList.remove("answered");
+  vas.removeAttribute("aria-valuenow");
+  $("btn-next").disabled = true;
+  patch.style.background = "var(--ground)";
+  cur = null;
+  show("s-trial");
+  setTimeout(() => {
+    patch.style.background = hex(t.color.rgb);
+    cur = { onset: performance.now(), vas: null, rtFirst: null, nClicks: 0, timedOut: 0 };
+    vas.focus({ preventScroll: true });
+    if (CONFIG.TRIAL_TIMEOUT_MS > 0) {
+      trialTimer = setTimeout(() => { if (cur) { cur.timedOut = 1; endTrial(); } }, CONFIG.TRIAL_TIMEOUT_MS);
+    }
+  }, CONFIG.ISI_MS);
+}
+function endTrial() {
+  clearTimeout(trialTimer); trialTimer = null;
+  const t = trials[idx];
+  const c = t.color;
+  session.rows.push({
+    study_id: CONFIG.STUDY_ID,
+    session_id: session.id,
+    subject_code: session.subject,
+    participant_id: session.pid,
+    lang,
+    practice: t.practice,
+    trial: idx + 1,
+    rep: t.rep,
+    color_name: c.name,
+    hue_deg: c.hue == null ? "" : c.hue,
+    L_star: c.L, C_star: c.C,
+    r: c.rgb[0], g: c.rgb[1], b: c.rgb[2],
+    hex: hex(c.rgb),
+    vas: cur.vas == null ? "" : cur.vas,
+    timed_out: cur.timedOut,
+    rt_first_ms: cur.rtFirst == null ? "" : cur.rtFirst,
+    rt_submit_ms: Math.round(performance.now() - cur.onset),
+    n_adjust: cur.nClicks,
+    timestamp: new Date().toISOString(),
+    ...session.device
+  });
+  sendTrial(session.rows[session.rows.length - 1]);
+  idx++;
+  if (idx < trials.length && !trials[idx].practice && !mainStarted) {
+    mainStarted = true;
+    $("s-main-intro").querySelector("[data-i18n='main1']").textContent =
+      fmt(T.main1, { n: trials.filter(x => !x.practice).length });
+    show("s-main-intro");
+  } else if (idx < trials.length) {
+    startTrial();
+  } else {
+    finish();
+  }
+}
+
+/* ---------- network ---------- */
+async function post(payload, timeoutMs = 10000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(CONFIG.ENDPOINT_URL, {
+      method: "POST", body: JSON.stringify(payload),
+      headers: { "Content-Type": "text/plain;charset=utf-8" }, signal: ctrl.signal
+    });
+    return await res.json();
+  } finally { clearTimeout(timer); }
+}
+function sendTrial(row) {
+  if (!CONFIG.ENDPOINT_URL) return;
+  const cols = Object.keys(row);
+  const p = post({ action: "trial", columns: cols, row: cols.map(k => row[k]) })
+    .then(j => { if (!j || !j.ok) sendFailures++; })
+    .catch(() => { sendFailures++; });
+  pending.push(p);
+}
+
+/* ---------- finish + submit ---------- */
+function columns() { return Object.keys(session.rows[0] || {}); }
+function toCsv() {
+  const cols = columns();
+  const esc = (v) => {
+    const s = v == null ? "" : String(v);
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  return [cols.join(","), ...session.rows.map(r => cols.map(k => esc(r[k])).join(","))].join("\n");
+}
+async function finish() {
+  show("s-done");
+  $("code").textContent = session.subject ? `${session.subject}-${session.id}` : session.id;
+  $("subject").textContent = session.subject || "—";
+  const st = $("send-status");
+  if (!CONFIG.ENDPOINT_URL) { st.textContent = T.offline; return; }
+  st.textContent = T.sending;
+  await Promise.all(pending);
+  let finished = false;
+  try {
+    const j = await post({ action: "finish", session_id: session.id, n_trials: session.rows.length });
+    finished = !!(j && j.ok);
+  } catch (e) { /* fall through */ }
+  if (sendFailures > 0 || !session.subject) st.textContent = T.partial;
+  else st.textContent = finished ? T.sent : T.sentUnconfirmed;
+}
+$("btn-csv").addEventListener("click", () => {
+  const blob = new Blob(["\uFEFF" + toCsv()], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `${CONFIG.STUDY_ID}_${session.pid || "anon"}_${session.id}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+});
+
+/* ---------- wiring ---------- */
+document.querySelectorAll(".lang button").forEach(b => b.addEventListener("click", () => {
+  applyLang(b.dataset.lang);
+  show("s-consent");
+}));
+$("consent").addEventListener("change", () => { $("btn-consent").disabled = !$("consent").checked; });
+$("btn-consent").addEventListener("click", () => {
+  session.pid = $("pid").value.trim();
+  show("s-screen");
+});
+$("btn-fs").addEventListener("click", () => {
+  const el = document.documentElement;
+  if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
+});
+$("btn-screen").addEventListener("click", () => show("s-instr"));
+$("btn-start").addEventListener("click", async () => {
+  const btn = $("btn-start");
+  btn.disabled = true;
+  btn.textContent = T.preparing;
+  session.device = deviceInfo();
+  if (CONFIG.ENDPOINT_URL) {
+    try {
+      const j = await post({ action: "register", study_id: CONFIG.STUDY_ID, session_id: session.id,
+                             participant_id: session.pid, lang, device: session.device });
+      if (j && j.ok && j.subject_code) session.subject = j.subject_code;
+    } catch (e) { /* no code: page continues, data still downloadable */ }
+    if (!session.subject) sendFailures++;
+  }
+  btn.disabled = false;
+  btn.textContent = T.startPractice;
+  trials = buildSequence();
+  idx = 0;
+  startTrial();
+});
+$("btn-main").addEventListener("click", startTrial);
+$("btn-restart").addEventListener("click", () => location.reload());
+$("btn-next").addEventListener("click", () => { if (cur && cur.vas != null) endTrial(); });
+</script>
+
+</body>
+</html>
