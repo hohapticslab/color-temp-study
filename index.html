@@ -76,7 +76,7 @@
 
   label.field { display: block; font-size: 14px; color: var(--ink-soft); }
   label.field span { display: block; margin-bottom: 6px; }
-  input[type="text"] {
+  input[type="text"], input[type="number"] {
     width: 100%;
     font: 500 16px var(--mono);
     padding: 10px 12px;
@@ -85,12 +85,20 @@
     color: var(--ink);
     border-radius: 0;
   }
-  input[type="text"]:focus-visible, button:focus-visible, .vas:focus-visible, .lang button:focus-visible {
+  input[type="text"]:focus-visible, input[type="number"]:focus-visible, button:focus-visible, .vas:focus-visible, .lang button:focus-visible, input[type="radio"]:focus-visible {
     outline: 2px solid var(--focus);
     outline-offset: 2px;
   }
   .check { display: flex; gap: 10px; align-items: flex-start; font-size: 15px; color: var(--ink); cursor: pointer; }
   .check input { margin-top: 5px; width: 18px; height: 18px; accent-color: var(--ink); flex: none; }
+  .radio-group { display: flex; gap: 18px; flex-wrap: wrap; }
+  .radio-group label {
+    display: flex; gap: 8px; align-items: center;
+    font-size: 15px; color: var(--ink); cursor: pointer;
+  }
+  .radio-group input[type="radio"] {
+    width: 18px; height: 18px; accent-color: var(--ink); flex: none; margin: 0;
+  }
 
   button {
     font: 600 15px var(--sans);
@@ -114,6 +122,49 @@
   }
   .lang button small { font: 400 12px var(--mono); color: var(--ink-faint); letter-spacing: 0.06em; }
   .lang button:hover { border-color: var(--ink); }
+
+  /* Persistent language switcher (top-right, visible on every screen except the initial chooser) */
+  .lang-switcher {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 100;
+    font-family: var(--sans);
+  }
+  .lang-switcher .toggle {
+    display: flex; align-items: center; gap: 6px;
+    font: 600 13px var(--mono);
+    letter-spacing: 0.04em;
+    padding: 8px 12px;
+    background: var(--panel);
+    color: var(--ink);
+    border: 1px solid var(--panel-edge);
+  }
+  .lang-switcher .toggle:hover { border-color: var(--ink); }
+  .lang-switcher .toggle .caret { font-size: 10px; opacity: 0.6; }
+  .lang-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    display: grid;
+    min-width: 150px;
+    background: #fff;
+    border: 1px solid var(--panel-edge);
+  }
+  .lang-menu button {
+    display: flex; justify-content: space-between; align-items: center;
+    width: 100%; text-align: left;
+    font: 500 14px var(--sans);
+    padding: 10px 14px;
+    background: #fff;
+    color: var(--ink);
+    border: none;
+    border-bottom: 1px solid var(--panel-edge);
+  }
+  .lang-menu button:last-child { border-bottom: none; }
+  .lang-menu button:hover { background: var(--panel); }
+  .lang-menu button[aria-current="true"] { font-weight: 600; }
+  .lang-menu button[aria-current="true"]::after { content: "✓"; font-size: 12px; }
 
   /* Trial screen */
   .trial {
@@ -181,6 +232,16 @@
 
 </head>
 <body>
+<div class="lang-switcher" id="lang-switcher" style="display:none">
+  <button type="button" class="toggle" id="lang-switch-btn" aria-haspopup="true" aria-expanded="false">
+    <span id="lang-switch-label">EN</span><span class="caret">▾</span>
+  </button>
+  <div class="lang-menu" id="lang-menu" hidden>
+    <button type="button" data-lang="ja">日本語</button>
+    <button type="button" data-lang="en">English</button>
+    <button type="button" data-lang="zh-Hant">繁體中文</button>
+  </div>
+</div>
 <main>
   <!-- 0. Language -->
   <section class="screen active" id="s-lang">
@@ -207,6 +268,18 @@
           <span data-i18n="pidLabel"></span>
           <input type="text" id="pid" autocomplete="off" spellcheck="false" maxlength="40">
         </label>
+        <label class="field">
+          <span data-i18n="ageLabel"></span>
+          <input type="number" id="age" inputmode="numeric" min="0" max="120" step="1" autocomplete="off">
+        </label>
+        <div class="field">
+          <span data-i18n="genderLabel"></span>
+          <div class="radio-group" id="gender-group">
+            <label><input type="radio" name="gender" value="male"><span data-i18n="genderMale"></span></label>
+            <label><input type="radio" name="gender" value="female"><span data-i18n="genderFemale"></span></label>
+            <label><input type="radio" name="gender" value="no_answer"><span data-i18n="genderNoAnswer"></span></label>
+          </div>
+        </div>
         <label class="check">
           <input type="checkbox" id="consent">
           <span data-i18n="consentCheck"></span>
@@ -313,7 +386,7 @@ const CONFIG = {
   STUDY_ID: "color-temp-vas-v1",
   // Google Apps Script web-app URL (see README). Leave "" to disable
   // online submission; participants then download a CSV at the end.
-  ENDPOINT_URL: "https://script.google.com/macros/s/AKfycbwJBoZtpLC3x5DjGq-Mh9Wm6K4qTm_VjZJiABAtCNuQKPFgq2al6TyP5zs-kFCVg23V/exec",
+  ENDPOINT_URL: "https://script.google.com/macros/s/AKfycbxLdmTyOn5jF70sgHw4hiFL2F9Tnx5V8OXkSbkH04JnSCA9nLdAEiU-Y8WiX4B7vmzQEA/exec",
   REPS: 1,                 // repetitions of each color (1 = each color shown once)
   ISI_MS: 500,             // blank grey between trials
   TRIAL_TIMEOUT_MS: 60000, // trial auto-advances after this; 0 = no limit
@@ -347,6 +420,11 @@ const I18N = {
     consent1: "本調査は、色から受ける温度の印象を調べる研究の一環として行われます。所要時間は約5分です。画面に表示される色を見て、その色から感じる温度を線の上で答えていただきます。",
     consent2: "回答は匿名で扱われ、研究目的にのみ使用されます。参加は任意であり、いつでもブラウザを閉じて中止できます。",
     pidLabel: "参加者ID（配布されたIDがある場合は入力してください）",
+    ageLabel: "年齢",
+    genderLabel: "性別",
+    genderMale: "男性",
+    genderFemale: "女性",
+    genderNoAnswer: "無回答",
     consentCheck: "上記の説明を読み、調査への参加に同意します。",
     screenTitle: "画面の準備",
     screen1: "画面の明るさを普段お使いの状態にしてください。",
@@ -386,6 +464,11 @@ const I18N = {
     consent1: "This survey is part of a study on the temperature impressions evoked by colors. It takes about 5 minutes. You will see a color on the screen and indicate, on a line, how warm or cold it feels to you.",
     consent2: "Responses are anonymous and used only for research. Participation is voluntary; you may stop at any time by closing the browser.",
     pidLabel: "Participant ID (enter the ID you were given, if any)",
+    ageLabel: "Age",
+    genderLabel: "Gender",
+    genderMale: "Male",
+    genderFemale: "Female",
+    genderNoAnswer: "Prefer not to answer",
     consentCheck: "I have read the information above and agree to take part.",
     screenTitle: "Screen setup",
     screen1: "Set your screen brightness to the level you normally use.",
@@ -425,6 +508,11 @@ const I18N = {
     consent1: "本調查為探討顏色所引發之溫度印象的研究之一部分，全程約需5分鐘。畫面上會顯示一種顏色，請在線段上標示您覺得它有多冷或多熱。",
     consent2: "您的回答將以匿名方式處理，僅用於研究目的。參與完全自願，您可隨時關閉瀏覽器中止作答。",
     pidLabel: "參與者編號（若您有收到編號，請在此輸入）",
+    ageLabel: "年齡",
+    genderLabel: "性別",
+    genderMale: "男性",
+    genderFemale: "女性",
+    genderNoAnswer: "不願回答",
     consentCheck: "我已閱讀上述說明，並同意參與本調查。",
     screenTitle: "螢幕設定",
     screen1: "請將螢幕亮度調整為您平常使用的狀態。",
@@ -470,6 +558,8 @@ const session = {
   id: makeId(),
   subject: "",       // assigned by the sheet at registration (S001, S002, …)
   pid: "",
+  age: "",
+  gender: "",
   startedAt: new Date().toISOString(),
   device: null,
   rows: []
@@ -494,6 +584,7 @@ function hex([r, g, b]) { return "#" + [r, g, b].map(v => v.toString(16).padStar
 function fmt(s, vars) { return s.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? ""); }
 
 /* ---------- i18n ---------- */
+const LANG_LABELS = { ja: "JA", en: "EN", "zh-Hant": "繁中" };
 function applyLang(code) {
   lang = code;
   T = I18N[code];
@@ -503,11 +594,23 @@ function applyLang(code) {
     if (key in T) el.textContent = T[key];
   });
   $("btn-fs").classList.toggle("hidden", !document.documentElement.requestFullscreen);
+  // switcher UI
+  $("lang-switch-label").textContent = LANG_LABELS[code] || code;
+  document.querySelectorAll("#lang-menu button").forEach(b => {
+    b.toggleAttribute("aria-current", b.dataset.lang === code);
+  });
+  // re-render dynamic text that isn't driven by data-i18n, for whichever screen is active
+  if ($("s-trial").classList.contains("active")) updateCounterText();
+  if ($("s-main-intro").classList.contains("active")) renderMainIntroText();
+  if ($("s-done").classList.contains("active") && lastStatusKey) $("send-status").textContent = T[lastStatusKey];
 }
 
 /* ---------- navigation ---------- */
 function show(id) {
   document.querySelectorAll(".screen").forEach(s => s.classList.toggle("active", s.id === id));
+  $("lang-switcher").style.display = (id === "s-lang") ? "none" : "block";
+  $("lang-menu").hidden = true;
+  $("lang-switch-btn").setAttribute("aria-expanded", "false");
   window.scrollTo(0, 0);
 }
 
@@ -586,11 +689,16 @@ vas.addEventListener("keydown", (e) => {
 });
 
 /* ---------- trials ---------- */
-function startTrial() {
+function updateCounterText() {
+  if (!trials.length || idx >= trials.length) return;
   const t = trials[idx];
   const mainTotal = trials.filter(x => !x.practice).length;
   const mainIndex = trials.slice(0, idx + 1).filter(x => !x.practice).length;
   $("counter").textContent = t.practice ? T.practice : fmt(T.counter, { i: mainIndex, n: mainTotal });
+}
+function startTrial() {
+  const t = trials[idx];
+  updateCounterText();
   vas.classList.remove("answered");
   vas.removeAttribute("aria-valuenow");
   $("btn-next").disabled = true;
@@ -606,6 +714,10 @@ function startTrial() {
     }
   }, CONFIG.ISI_MS);
 }
+let mainIntroCount = 0;
+function renderMainIntroText() {
+  $("s-main-intro").querySelector("[data-i18n='main1']").textContent = fmt(T.main1, { n: mainIntroCount });
+}
 function endTrial() {
   clearTimeout(trialTimer); trialTimer = null;
   const t = trials[idx];
@@ -615,6 +727,8 @@ function endTrial() {
     session_id: session.id,
     subject_code: session.subject,
     participant_id: session.pid,
+    age: session.age,
+    gender: session.gender,
     lang,
     practice: t.practice,
     trial: idx + 1,
@@ -636,8 +750,8 @@ function endTrial() {
   idx++;
   if (idx < trials.length && !trials[idx].practice && !mainStarted) {
     mainStarted = true;
-    $("s-main-intro").querySelector("[data-i18n='main1']").textContent =
-      fmt(T.main1, { n: trials.filter(x => !x.practice).length });
+    mainIntroCount = trials.filter(x => !x.practice).length;
+    renderMainIntroText();
     show("s-main-intro");
   } else if (idx < trials.length) {
     startTrial();
@@ -677,21 +791,25 @@ function toCsv() {
   };
   return [cols.join(","), ...session.rows.map(r => cols.map(k => esc(r[k])).join(","))].join("\n");
 }
+let lastStatusKey = null;
+function setStatus(key) {
+  lastStatusKey = key;
+  $("send-status").textContent = T[key];
+}
 async function finish() {
   show("s-done");
   $("code").textContent = session.subject ? `${session.subject}-${session.id}` : session.id;
   $("subject").textContent = session.subject || "—";
-  const st = $("send-status");
-  if (!CONFIG.ENDPOINT_URL) { st.textContent = T.offline; return; }
-  st.textContent = T.sending;
+  if (!CONFIG.ENDPOINT_URL) { setStatus("offline"); return; }
+  setStatus("sending");
   await Promise.all(pending);
   let finished = false;
   try {
     const j = await post({ action: "finish", session_id: session.id, n_trials: session.rows.length });
     finished = !!(j && j.ok);
   } catch (e) { /* fall through */ }
-  if (sendFailures > 0 || !session.subject) st.textContent = T.partial;
-  else st.textContent = finished ? T.sent : T.sentUnconfirmed;
+  if (sendFailures > 0 || !session.subject) setStatus("partial");
+  else setStatus(finished ? "sent" : "sentUnconfirmed");
 }
 $("btn-csv").addEventListener("click", () => {
   const blob = new Blob(["\uFEFF" + toCsv()], { type: "text/csv;charset=utf-8" });
@@ -706,9 +824,44 @@ document.querySelectorAll(".lang button").forEach(b => b.addEventListener("click
   applyLang(b.dataset.lang);
   show("s-consent");
 }));
-$("consent").addEventListener("change", () => { $("btn-consent").disabled = !$("consent").checked; });
+
+/* Persistent language switcher: lets the participant change language mid-experiment */
+$("lang-switch-btn").addEventListener("click", (e) => {
+  e.stopPropagation();
+  const open = $("lang-menu").hidden;
+  $("lang-menu").hidden = !open;
+  $("lang-switch-btn").setAttribute("aria-expanded", String(open));
+});
+document.querySelectorAll("#lang-menu button").forEach(b => b.addEventListener("click", () => {
+  applyLang(b.dataset.lang);
+  $("lang-menu").hidden = true;
+  $("lang-switch-btn").setAttribute("aria-expanded", "false");
+}));
+document.addEventListener("click", (e) => {
+  if (!$("lang-switcher").contains(e.target)) {
+    $("lang-menu").hidden = true;
+    $("lang-switch-btn").setAttribute("aria-expanded", "false");
+  }
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    $("lang-menu").hidden = true;
+    $("lang-switch-btn").setAttribute("aria-expanded", "false");
+  }
+});
+
+function updateConsentGate() {
+  const ageOk = $("age").value.trim() !== "";
+  const genderOk = !!document.querySelector('input[name="gender"]:checked');
+  $("btn-consent").disabled = !($("consent").checked && ageOk && genderOk);
+}
+$("consent").addEventListener("change", updateConsentGate);
+$("age").addEventListener("input", updateConsentGate);
+document.querySelectorAll('input[name="gender"]').forEach(r => r.addEventListener("change", updateConsentGate));
 $("btn-consent").addEventListener("click", () => {
   session.pid = $("pid").value.trim();
+  session.age = $("age").value.trim();
+  session.gender = (document.querySelector('input[name="gender"]:checked') || {}).value || "";
   show("s-screen");
 });
 $("btn-fs").addEventListener("click", () => {
@@ -724,7 +877,8 @@ $("btn-start").addEventListener("click", async () => {
   if (CONFIG.ENDPOINT_URL) {
     try {
       const j = await post({ action: "register", study_id: CONFIG.STUDY_ID, session_id: session.id,
-                             participant_id: session.pid, lang, device: session.device });
+                             participant_id: session.pid, age: session.age, gender: session.gender,
+                             lang, device: session.device });
       if (j && j.ok && j.subject_code) session.subject = j.subject_code;
     } catch (e) { /* no code: page continues, data still downloadable */ }
     if (!session.subject) sendFailures++;
