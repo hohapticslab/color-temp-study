@@ -25,6 +25,7 @@
   html[lang="zh-Hant"] { --sans: "Noto Sans TC", "Noto Sans", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif; }
 
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   html, body { height: 100%; }
   body {
     margin: 0;
@@ -180,10 +181,27 @@
     align-self: flex-start;
     min-height: 20px;
   }
-  .patch {
+  .stimulus {
     width: min(58vmin, 380px);
     height: min(58vmin, 380px);
-    background: var(--ground);
+    display: grid;
+  }
+  .patch { width: 100%; height: 100%; background: var(--ground); }
+  .probe {
+    width: 100%; height: 100%;
+    display: grid; place-items: center; align-content: center; gap: 14px;
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    padding: 24px;
+    text-align: center;
+  }
+  .probe-prompt {
+    font-size: 13px; font-weight: 400; color: var(--ink-faint);
+    letter-spacing: 0.02em;
+  }
+  .probe-text {
+    font-size: clamp(19px, 3.4vmin, 26px); font-weight: 600;
+    color: var(--ink); line-height: 1.45; text-wrap: balance;
   }
   .vas-wrap { width: 100%; max-width: 560px; }
   .vas {
@@ -215,6 +233,8 @@
     margin-top: 8px;
   }
   .anchors span { flex: 1 1 0; max-width: 46%; }
+  .anchors.short { font-size: 15px; }
+  .anchors.short span { flex: 0 0 auto; max-width: none; }
   .anchors span:last-child { text-align: right; }
   @media (max-width: 520px) { .anchors { font-size: 12px; gap: 12px; } }
   .trial .actions { justify-content: center; margin-top: 0; }
@@ -310,7 +330,7 @@
       <p data-i18n="instr2"></p>
       <div class="demo vas-wrap" style="margin:18px 0 22px">
         <div class="vas"><div class="line"></div><div class="end l"></div><div class="end r"></div><div class="marker"></div></div>
-        <div class="anchors"><span data-i18n="cold"></span><span data-i18n="hot"></span></div>
+        <div class="anchors"><span data-i18n="coldLong"></span><span data-i18n="hotLong"></span></div>
       </div>
       <p data-i18n="instr3"></p>
       <div class="actions">
@@ -323,12 +343,18 @@
   <section class="screen" id="s-trial">
     <div class="trial">
       <div class="counter" id="counter"></div>
-      <div class="patch" id="patch"></div>
+      <div class="stimulus">
+        <div class="patch" id="patch"></div>
+        <div class="probe" id="probe" hidden>
+          <span class="probe-prompt" id="probe-prompt"></span>
+          <span class="probe-text" id="probe-text"></span>
+        </div>
+      </div>
       <div class="vas-wrap">
         <div class="vas" id="vas" tabindex="0" role="slider" aria-valuemin="0" aria-valuemax="100">
           <div class="line"></div><div class="end l"></div><div class="end r"></div><div class="marker" id="marker"></div>
         </div>
-        <div class="anchors"><span data-i18n="cold"></span><span data-i18n="hot"></span></div>
+        <div class="anchors short"><span data-i18n="cold"></span><span data-i18n="hot"></span></div>
       </div>
       <div class="actions">
         <button type="button" id="btn-next" disabled data-i18n="next"></button>
@@ -385,10 +411,10 @@ const CONFIG = {
   REPS: 1,                 // repetitions of each color (1 = each color shown once)
   ISI_MS: 500,             // blank grey between trials
   TRIAL_TIMEOUT_MS: 0,     // 0 = no time limit; set e.g. 60000 for a 60 s limit
-  PRACTICE_COLORS: [       // shown before the main block, flagged practice=1
-    { name: "practice-red",   hue: null, L: "", C: "", rgb: [255, 0, 0] },
-    { name: "practice-green", hue: null, L: "", C: "", rgb: [0, 255, 0] }
-  ],
+  // Practice = rating described thermal experiences, not colors. These set the
+  // participant's use of the scale and give per-person landmarks in the data.
+  // Recorded with practice=1 and trial_type="referent".
+  REFERENTS: ["ref_cold", "ref_hot", "ref_neutral"],
   // 12 CIELCh hues, constant L* = 70, maximum in-gamut chroma per hue
   COLORS: [
     { name: "h040", hue: 40,  L: 70, C: 104.6, rgb: [255, 0, 0] },
@@ -428,13 +454,19 @@ const I18N = {
     consentCheck: "上記の説明を読み、調査への参加に同意します。",
     instrTitle: "回答のしかた",
     instr1: "画面の中央に色が表示されます。その色から感じる温度の印象を、下の線の上をクリック（タップ）して答えてください。",
-    instr2: "線の両端は、下に示す温度の目安を表します。線上のどこでも自由に選べ、選んだ後にドラッグして調整できます。",
-    instr3: "正解はありません。あまり考え込まず、直感でお答えください。まず練習を2回行います。",
-    cold: "冷蔵庫から出したばかりの飲み物のように冷たい（約15℃）",
-    hot: "少し熱めのお湯のように、はっきり熱い（約45℃）",
+    instr2: "線の両端は、下に示す温度の感じ方を表します。線上のどこでも自由に選べ、選んだ後にドラッグして調整できます。",
+    instr3: "正解はありません。あまり考え込まず、直感でお答えください。まず、言葉で示された温度の感じ方を使って、目盛りの使い方に慣れていただきます。",
+    coldLong: "川の水や湧き水のように、はっきり冷たい",
+    hotLong: "少し熱めのお風呂のお湯のように、はっきり熱い",
+    cold: "とても冷たい",
+    hot: "とても熱い",
+    probePrompt: "次の温度を思い浮かべてください",
+    ref_cold: "川の水・湧き水",
+    ref_hot: "少し熱めのお風呂のお湯",
+    ref_neutral: "触れても冷たくも熱くもない水",
     startPractice: "練習を始める",
     mainTitle: "本番を始めます",
-    main1: "練習は終了です。ここからの回答が記録されます。全部で {n} 試行あります。",
+    main1: "練習は終了です。ここからは {n} 種類の色が順番に表示されます。同じ目盛りでお答えください。",
     startMain: "本番を始める",
     next: "次へ",
     counter: "{i} / {n}",
@@ -471,13 +503,19 @@ const I18N = {
     consentCheck: "I have read the information above and agree to take part.",
     instrTitle: "How to respond",
     instr1: "A color will appear in the middle of the screen. Click (or tap) on the line below it to indicate the temperature impression you get from that color.",
-    instr2: "The two ends of the line are the reference temperatures shown below it. You can choose any point on the line and drag to adjust after clicking.",
-    instr3: "There are no right or wrong answers. Go with your first impression. We will start with two practice trials.",
-    cold: "Cold as a drink just taken out of the fridge (~15°C)",
-    hot: "Hot as slightly-too-hot bath water, clearly hot (~45°C)",
+    instr2: "The two ends of the line stand for the sensations described below it. You can choose any point on the line and drag to adjust after clicking.",
+    instr3: "There are no right or wrong answers. Go with your first impression. To begin, you will rate a few described sensations so you get used to the scale.",
+    coldLong: "As cold as stream or spring water — clearly cold to the touch",
+    hotLong: "As hot as slightly-too-hot bath water — clearly hot",
+    cold: "Very cold",
+    hot: "Very hot",
+    probePrompt: "Imagine how this feels",
+    ref_cold: "Stream or spring water",
+    ref_hot: "Slightly-too-hot bath water",
+    ref_neutral: "Water that feels neither cold nor warm",
     startPractice: "Start practice",
     mainTitle: "Main session",
-    main1: "Practice is complete. From here on your responses are recorded. There are {n} trials in total.",
+    main1: "Practice is complete. You will now see {n} colors one at a time. Please answer on the same scale.",
     startMain: "Start",
     next: "Next",
     counter: "{i} / {n}",
@@ -514,13 +552,19 @@ const I18N = {
     consentCheck: "我已閱讀上述說明，並同意參與本調查。",
     instrTitle: "作答方式",
     instr1: "畫面中央會顯示一種顏色。請點擊（或輕觸）下方線段上的位置，表示這個顏色帶給您的溫度感受。",
-    instr2: "線段兩端代表下方所示的溫度參考。您可以選擇線段上任何一點，點選後也可拖曳調整。",
-    instr3: "沒有正確答案，請憑第一印象作答。我們先進行兩次練習。",
-    cold: "像剛從冰箱拿出的飲料一樣冰涼（約15°C）",
-    hot: "像偏熱的洗澡水，明顯覺得熱（約45°C）",
+    instr2: "線段的兩端代表下方所描述的溫度感受。您可以選擇線段上任何一點，點選後也可拖曳調整。",
+    instr3: "沒有正確答案，請憑第一印象作答。開始之前，我們會先用文字描述的溫度感受，讓您熟悉這個量尺。",
+    coldLong: "像溪水或山泉水一樣，摸起來明顯覺得冷",
+    hotLong: "像偏熱的洗澡水，明顯覺得熱",
+    cold: "非常冷",
+    hot: "非常熱",
+    probePrompt: "請想像以下的溫度感受",
+    ref_cold: "溪水、山泉水",
+    ref_hot: "偏熱的洗澡水",
+    ref_neutral: "摸起來不冷不熱的水",
     startPractice: "開始練習",
     mainTitle: "正式作答",
-    main1: "練習結束。接下來的回答將會被記錄。總共有 {n} 題。",
+    main1: "練習結束。接下來會依序出現 {n} 種顏色，請用同樣的量尺作答。",
     startMain: "開始",
     next: "下一題",
     counter: "{i} / {n}",
@@ -596,7 +640,7 @@ function applyLang(code) {
     b.toggleAttribute("aria-current", b.dataset.lang === code);
   });
   // re-render dynamic text that isn't driven by data-i18n, for whichever screen is active
-  if ($("s-trial").classList.contains("active")) updateCounterText();
+  if ($("s-trial").classList.contains("active")) { updateCounterText(); if (!$("probe").hidden) renderProbeText(); }
   if ($("s-main-intro").classList.contains("active")) renderMainIntroText();
   if ($("s-done").classList.contains("active") && lastStatusKey) $("send-status").textContent = T[lastStatusKey];
 }
@@ -613,14 +657,14 @@ function show(id) {
 /* ---------- sequence ---------- */
 function buildSequence() {
   const seq = [];
-  CONFIG.PRACTICE_COLORS.forEach(c => seq.push({ color: c, practice: 1, rep: 0 }));
+  CONFIG.REFERENTS.forEach(key => seq.push({ kind: "referent", key, practice: 1, rep: 0 }));
   let prev = null;
   for (let r = 1; r <= CONFIG.REPS; r++) {
     let block;
     do {
       block = shuffle(CONFIG.COLORS.slice());
     } while (prev && block[0].name === prev.name && CONFIG.COLORS.length > 1);
-    block.forEach(c => seq.push({ color: c, practice: 0, rep: r }));
+    block.forEach(c => seq.push({ kind: "color", color: c, practice: 0, rep: r }));
     prev = block[block.length - 1];
   }
   return seq;
@@ -692,17 +736,29 @@ function updateCounterText() {
   const mainIndex = trials.slice(0, idx + 1).filter(x => !x.practice).length;
   $("counter").textContent = t.practice ? T.practice : fmt(T.counter, { i: mainIndex, n: mainTotal });
 }
+function renderProbeText() {
+  const t = trials[idx];
+  if (!t || t.kind !== "referent") return;
+  $("probe-prompt").textContent = T.probePrompt;
+  $("probe-text").textContent = T[t.key];
+}
 function startTrial() {
   const t = trials[idx];
+  const isColor = t.kind === "color";
   updateCounterText();
   vas.classList.remove("answered");
   vas.removeAttribute("aria-valuenow");
   $("btn-next").disabled = true;
   patch.style.background = "var(--ground)";
+  patch.hidden = !isColor;
+  $("probe").hidden = isColor;
+  $("probe-prompt").textContent = "";
+  $("probe-text").textContent = "";
   cur = null;
   show("s-trial");
   setTimeout(() => {
-    patch.style.background = hex(t.color.rgb);
+    if (isColor) patch.style.background = hex(t.color.rgb);
+    else renderProbeText();
     cur = { onset: performance.now(), vas: null, rtFirst: null, nClicks: 0, timedOut: 0 };
     vas.focus({ preventScroll: true });
     if (CONFIG.TRIAL_TIMEOUT_MS > 0) {
@@ -717,7 +773,8 @@ function renderMainIntroText() {
 function endTrial() {
   clearTimeout(trialTimer); trialTimer = null;
   const t = trials[idx];
-  const c = t.color;
+  const isColor = t.kind === "color";
+  const c = isColor ? t.color : null;
   session.rows.push({
     study_id: CONFIG.STUDY_ID,
     session_id: session.id,
@@ -728,13 +785,14 @@ function endTrial() {
     color_vision_difficulty: session.colorVision,
     lang,
     practice: t.practice,
+    trial_type: isColor ? "color" : "referent",
     trial: idx + 1,
     rep: t.rep,
-    color_name: c.name,
-    hue_deg: c.hue == null ? "" : c.hue,
-    L_star: c.L, C_star: c.C,
-    r: c.rgb[0], g: c.rgb[1], b: c.rgb[2],
-    hex: hex(c.rgb),
+    color_name: isColor ? c.name : t.key,
+    hue_deg: isColor && c.hue != null ? c.hue : "",
+    L_star: isColor ? c.L : "", C_star: isColor ? c.C : "",
+    r: isColor ? c.rgb[0] : "", g: isColor ? c.rgb[1] : "", b: isColor ? c.rgb[2] : "",
+    hex: isColor ? hex(c.rgb) : "",
     vas: cur.vas == null ? "" : cur.vas,
     timed_out: cur.timedOut,
     rt_first_ms: cur.rtFirst == null ? "" : cur.rtFirst,
