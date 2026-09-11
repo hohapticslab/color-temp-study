@@ -76,7 +76,7 @@
 
   label.field { display: block; font-size: 14px; color: var(--ink-soft); }
   label.field span { display: block; margin-bottom: 6px; }
-  input[type="text"], input[type="number"] {
+  input[type="text"], input[type="number"], select {
     width: 100%;
     font: 500 16px var(--mono);
     padding: 10px 12px;
@@ -85,7 +85,7 @@
     color: var(--ink);
     border-radius: 0;
   }
-  input[type="text"]:focus-visible, input[type="number"]:focus-visible, button:focus-visible, .vas:focus-visible, .lang button:focus-visible, input[type="radio"]:focus-visible {
+  input[type="text"]:focus-visible, input[type="number"]:focus-visible, select:focus-visible, button:focus-visible, .vas:focus-visible, .lang button:focus-visible, input[type="radio"]:focus-visible {
     outline: 2px solid var(--focus);
     outline-offset: 2px;
   }
@@ -142,6 +142,7 @@
   }
   .lang-switcher .toggle:hover { border-color: var(--ink); }
   .lang-switcher .toggle .caret { font-size: 10px; opacity: 0.6; }
+  .lang-menu[hidden] { display: none; }
   .lang-menu {
     position: absolute;
     top: calc(100% + 6px);
@@ -208,10 +209,14 @@
   }
   .vas.answered .marker { display: block; }
   .anchors {
-    display: flex; justify-content: space-between;
-    font-size: 15px; font-weight: 600; color: #1b1b1b;
-    margin-top: 4px;
+    display: flex; justify-content: space-between; gap: 20px;
+    font-size: 13px; font-weight: 600; color: #1b1b1b;
+    line-height: 1.35;
+    margin-top: 8px;
   }
+  .anchors span { flex: 1 1 0; max-width: 46%; }
+  .anchors span:last-child { text-align: right; }
+  @media (max-width: 520px) { .anchors { font-size: 12px; gap: 12px; } }
   .trial .actions { justify-content: center; margin-top: 0; }
 
   /* Demo VAS in instructions is not interactive */
@@ -246,7 +251,7 @@
   <!-- 0. Language -->
   <section class="screen active" id="s-lang">
     <div class="panel">
-      <p class="eyebrow">Kyushu University · Haptics Lab</p>
+      <p class="eyebrow">台灣中興大學 ・ 日本九州大學</p>
       <h1>言語を選んでください / Choose a language / 請選擇語言</h1>
       <div class="lang">
         <button type="button" data-lang="ja">日本語 <small>JA</small></button>
@@ -265,10 +270,6 @@
       <p data-i18n="consent2"></p>
       <div class="stack" style="margin-top:22px">
         <label class="field">
-          <span data-i18n="pidLabel"></span>
-          <input type="text" id="pid" autocomplete="off" spellcheck="false" maxlength="40">
-        </label>
-        <label class="field">
           <span data-i18n="ageLabel"></span>
           <input type="number" id="age" inputmode="numeric" min="0" max="120" step="1" autocomplete="off">
         </label>
@@ -280,6 +281,15 @@
             <label><input type="radio" name="gender" value="no_answer"><span data-i18n="genderNoAnswer"></span></label>
           </div>
         </div>
+        <label class="field">
+          <span data-i18n="cvLabel"></span>
+          <select id="colorvision">
+            <option value="" data-i18n="cvPlaceholder"></option>
+            <option value="yes" data-i18n="cvYes"></option>
+            <option value="no" data-i18n="cvNo"></option>
+            <option value="unsure" data-i18n="cvUnsure"></option>
+          </select>
+        </label>
         <label class="check">
           <input type="checkbox" id="consent">
           <span data-i18n="consentCheck"></span>
@@ -291,21 +301,6 @@
     </div>
   </section>
 
-  <!-- 2. Screen setup -->
-  <section class="screen" id="s-screen">
-    <div class="panel">
-      <p class="eyebrow" data-i18n="eyebrow"></p>
-      <h1 data-i18n="screenTitle"></h1>
-      <p data-i18n="screen1"></p>
-      <p data-i18n="screen2"></p>
-      <p data-i18n="screen3"></p>
-      <div class="actions">
-        <button type="button" class="secondary" id="btn-fs" data-i18n="fullscreen"></button>
-        <button type="button" id="btn-screen" data-i18n="next"></button>
-      </div>
-    </div>
-  </section>
-
   <!-- 3. Instructions -->
   <section class="screen" id="s-instr">
     <div class="panel">
@@ -313,7 +308,7 @@
       <h1 data-i18n="instrTitle"></h1>
       <p data-i18n="instr1"></p>
       <p data-i18n="instr2"></p>
-      <div class="demo vas-wrap" style="margin:18px 0 6px">
+      <div class="demo vas-wrap" style="margin:18px 0 22px">
         <div class="vas"><div class="line"></div><div class="end l"></div><div class="end r"></div><div class="marker"></div></div>
         <div class="anchors"><span data-i18n="cold"></span><span data-i18n="hot"></span></div>
       </div>
@@ -389,9 +384,10 @@ const CONFIG = {
   ENDPOINT_URL: "https://script.google.com/macros/s/AKfycbxLdmTyOn5jF70sgHw4hiFL2F9Tnx5V8OXkSbkH04JnSCA9nLdAEiU-Y8WiX4B7vmzQEA/exec",
   REPS: 1,                 // repetitions of each color (1 = each color shown once)
   ISI_MS: 500,             // blank grey between trials
-  TRIAL_TIMEOUT_MS: 60000, // trial auto-advances after this; 0 = no limit
-  PRACTICE_COLORS: [       // shown once before the main block, flagged practice=1
-    { name: "practice-grey", hue: null, L: 70, C: 0, rgb: [171, 171, 171] }
+  TRIAL_TIMEOUT_MS: 0,     // 0 = no time limit; set e.g. 60000 for a 60 s limit
+  PRACTICE_COLORS: [       // shown before the main block, flagged practice=1
+    { name: "practice-red",   hue: null, L: "", C: "", rgb: [255, 0, 0] },
+    { name: "practice-green", hue: null, L: "", C: "", rgb: [0, 255, 0] }
   ],
   // 12 CIELCh hues, constant L* = 70, maximum in-gamut chroma per hue
   COLORS: [
@@ -415,28 +411,27 @@ const CONFIG = {
    ============================================================ */
 const I18N = {
   ja: {
-    eyebrow: "九州大学 ・ ハプティクス研究室",
+    eyebrow: "台湾 中興大学 ・ 日本 九州大学",
     title: "色と温度の印象に関する調査",
     consent1: "本調査は、色から受ける温度の印象を調べる研究の一環として行われます。所要時間は約5分です。画面に表示される色を見て、その色から感じる温度を線の上で答えていただきます。",
     consent2: "回答は匿名で扱われ、研究目的にのみ使用されます。参加は任意であり、いつでもブラウザを閉じて中止できます。",
-    pidLabel: "参加者ID（配布されたIDがある場合は入力してください）",
     ageLabel: "年齢",
     genderLabel: "性別",
     genderMale: "男性",
     genderFemale: "女性",
     genderNoAnswer: "無回答",
+    cvLabel: "色の見分けにくさを感じることがありますか",
+    cvPlaceholder: "選択してください",
+    cvYes: "はい",
+    cvNo: "いいえ",
+    cvUnsure: "わからない",
     consentCheck: "上記の説明を読み、調査への参加に同意します。",
-    screenTitle: "画面の準備",
-    screen1: "画面の明るさを普段お使いの状態にしてください。",
-    screen2: "Night Shift・夜間モード・ブルーライトカットなどの色温度を変える機能、およびダークモードや画面フィルターはオフにしてください。",
-    screen3: "できるだけ周囲の照明が一定の場所で、正面から画面を見て回答してください。",
-    fullscreen: "全画面表示にする",
     instrTitle: "回答のしかた",
     instr1: "画面の中央に色が表示されます。その色から感じる温度の印象を、下の線の上をクリック（タップ）して答えてください。",
-    instr2: "左端が「とても冷たい」、右端が「とても熱い」です。線上のどこでも自由に選べ、選んだ後にドラッグして調整できます。",
-    instr3: "正解はありません。あまり考え込まず、直感でお答えください。まず練習を1回行います。",
-    cold: "とても冷たい",
-    hot: "とても熱い",
+    instr2: "線の両端は、下に示す温度の目安を表します。線上のどこでも自由に選べ、選んだ後にドラッグして調整できます。",
+    instr3: "正解はありません。あまり考え込まず、直感でお答えください。まず練習を2回行います。",
+    cold: "冷蔵庫から出したばかりの飲み物のように冷たい（約15℃）",
+    hot: "少し熱めのお湯のように、はっきり熱い（約45℃）",
     startPractice: "練習を始める",
     mainTitle: "本番を始めます",
     main1: "練習は終了です。ここからの回答が記録されます。全部で {n} 試行あります。",
@@ -459,28 +454,27 @@ const I18N = {
     restart: "次の参加者を開始"
   },
   en: {
-    eyebrow: "Kyushu University · Haptics Lab",
+    eyebrow: "National Chung Hsing University, Taiwan · Kyushu University, Japan",
     title: "Color and Temperature Impression Survey",
     consent1: "This survey is part of a study on the temperature impressions evoked by colors. It takes about 5 minutes. You will see a color on the screen and indicate, on a line, how warm or cold it feels to you.",
     consent2: "Responses are anonymous and used only for research. Participation is voluntary; you may stop at any time by closing the browser.",
-    pidLabel: "Participant ID (enter the ID you were given, if any)",
     ageLabel: "Age",
     genderLabel: "Gender",
     genderMale: "Male",
     genderFemale: "Female",
     genderNoAnswer: "Prefer not to answer",
+    cvLabel: "Do you have any difficulty distinguishing colors?",
+    cvPlaceholder: "Please select",
+    cvYes: "Yes",
+    cvNo: "No",
+    cvUnsure: "Not sure",
     consentCheck: "I have read the information above and agree to take part.",
-    screenTitle: "Screen setup",
-    screen1: "Set your screen brightness to the level you normally use.",
-    screen2: "Turn off Night Shift, night mode, blue-light filters, and any dark mode or screen filter that changes colors.",
-    screen3: "If possible, sit in steady lighting and look at the screen straight on.",
-    fullscreen: "Enter full screen",
     instrTitle: "How to respond",
     instr1: "A color will appear in the middle of the screen. Click (or tap) on the line below it to indicate the temperature impression you get from that color.",
-    instr2: "The left end means “very cold” and the right end means “very hot”. You can choose any point on the line and drag to adjust after clicking.",
-    instr3: "There are no right or wrong answers. Go with your first impression. We will start with one practice trial.",
-    cold: "Very cold",
-    hot: "Very hot",
+    instr2: "The two ends of the line are the reference temperatures shown below it. You can choose any point on the line and drag to adjust after clicking.",
+    instr3: "There are no right or wrong answers. Go with your first impression. We will start with two practice trials.",
+    cold: "Cold as a drink just taken out of the fridge (~15°C)",
+    hot: "Hot as slightly-too-hot bath water, clearly hot (~45°C)",
     startPractice: "Start practice",
     mainTitle: "Main session",
     main1: "Practice is complete. From here on your responses are recorded. There are {n} trials in total.",
@@ -503,28 +497,27 @@ const I18N = {
     restart: "New participant"
   },
   "zh-Hant": {
-    eyebrow: "九州大學 ・ 觸覺研究室",
+    eyebrow: "台灣中興大學 ・ 日本九州大學",
     title: "顏色與溫度印象調查",
     consent1: "本調查為探討顏色所引發之溫度印象的研究之一部分，全程約需5分鐘。畫面上會顯示一種顏色，請在線段上標示您覺得它有多冷或多熱。",
     consent2: "您的回答將以匿名方式處理，僅用於研究目的。參與完全自願，您可隨時關閉瀏覽器中止作答。",
-    pidLabel: "參與者編號（若您有收到編號，請在此輸入）",
     ageLabel: "年齡",
     genderLabel: "性別",
     genderMale: "男性",
     genderFemale: "女性",
     genderNoAnswer: "不願回答",
+    cvLabel: "您是否有辨識顏色困難的情形？",
+    cvPlaceholder: "請選擇",
+    cvYes: "是",
+    cvNo: "否",
+    cvUnsure: "不確定",
     consentCheck: "我已閱讀上述說明，並同意參與本調查。",
-    screenTitle: "螢幕設定",
-    screen1: "請將螢幕亮度調整為您平常使用的狀態。",
-    screen2: "請關閉夜覽（Night Shift）、夜間模式、濾藍光，以及深色模式等會改變顏色的螢幕濾鏡。",
-    screen3: "請盡量在光線穩定的環境中，正面注視螢幕作答。",
-    fullscreen: "進入全螢幕",
     instrTitle: "作答方式",
     instr1: "畫面中央會顯示一種顏色。請點擊（或輕觸）下方線段上的位置，表示這個顏色帶給您的溫度感受。",
-    instr2: "最左端代表「非常冷」，最右端代表「非常熱」。您可以選擇線段上任何一點，點選後也可拖曳調整。",
-    instr3: "沒有正確答案，請憑第一印象作答。我們先進行一次練習。",
-    cold: "非常冷",
-    hot: "非常熱",
+    instr2: "線段兩端代表下方所示的溫度參考。您可以選擇線段上任何一點，點選後也可拖曳調整。",
+    instr3: "沒有正確答案，請憑第一印象作答。我們先進行兩次練習。",
+    cold: "像剛從冰箱拿出的飲料一樣冰涼（約15°C）",
+    hot: "像偏熱的洗澡水，明顯覺得熱（約45°C）",
     startPractice: "開始練習",
     mainTitle: "正式作答",
     main1: "練習結束。接下來的回答將會被記錄。總共有 {n} 題。",
@@ -557,13 +550,16 @@ let T = I18N.en;
 const session = {
   id: makeId(),
   subject: "",       // assigned by the sheet at registration (S001, S002, …)
-  pid: "",
+  pid: "",           // auto-generated below (no longer typed by the participant)
   age: "",
   gender: "",
+  colorVision: "",
   startedAt: new Date().toISOString(),
   device: null,
   rows: []
 };
+session.pid = "P" + session.id;   // auto-generated participant id
+
 let trials = [];       // sequence of {color, practice, rep}
 let idx = 0;
 let cur = null;        // current trial timing/response
@@ -593,7 +589,7 @@ function applyLang(code) {
     const key = el.dataset.i18n;
     if (key in T) el.textContent = T[key];
   });
-  $("btn-fs").classList.toggle("hidden", !document.documentElement.requestFullscreen);
+  // the <select> keeps its chosen value while its option labels are re-translated
   // switcher UI
   $("lang-switch-label").textContent = LANG_LABELS[code] || code;
   document.querySelectorAll("#lang-menu button").forEach(b => {
@@ -729,6 +725,7 @@ function endTrial() {
     participant_id: session.pid,
     age: session.age,
     gender: session.gender,
+    color_vision_difficulty: session.colorVision,
     lang,
     practice: t.practice,
     trial: idx + 1,
@@ -853,22 +850,19 @@ document.addEventListener("keydown", (e) => {
 function updateConsentGate() {
   const ageOk = $("age").value.trim() !== "";
   const genderOk = !!document.querySelector('input[name="gender"]:checked');
-  $("btn-consent").disabled = !($("consent").checked && ageOk && genderOk);
+  const cvOk = $("colorvision").value !== "";
+  $("btn-consent").disabled = !($("consent").checked && ageOk && genderOk && cvOk);
 }
 $("consent").addEventListener("change", updateConsentGate);
+$("colorvision").addEventListener("change", updateConsentGate);
 $("age").addEventListener("input", updateConsentGate);
 document.querySelectorAll('input[name="gender"]').forEach(r => r.addEventListener("change", updateConsentGate));
 $("btn-consent").addEventListener("click", () => {
-  session.pid = $("pid").value.trim();
   session.age = $("age").value.trim();
   session.gender = (document.querySelector('input[name="gender"]:checked') || {}).value || "";
-  show("s-screen");
+  session.colorVision = $("colorvision").value;
+  show("s-instr");
 });
-$("btn-fs").addEventListener("click", () => {
-  const el = document.documentElement;
-  if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
-});
-$("btn-screen").addEventListener("click", () => show("s-instr"));
 $("btn-start").addEventListener("click", async () => {
   const btn = $("btn-start");
   btn.disabled = true;
@@ -878,6 +872,7 @@ $("btn-start").addEventListener("click", async () => {
     try {
       const j = await post({ action: "register", study_id: CONFIG.STUDY_ID, session_id: session.id,
                              participant_id: session.pid, age: session.age, gender: session.gender,
+                             color_vision_difficulty: session.colorVision,
                              lang, device: session.device });
       if (j && j.ok && j.subject_code) session.subject = j.subject_code;
     } catch (e) { /* no code: page continues, data still downloadable */ }
