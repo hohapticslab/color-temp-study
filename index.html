@@ -301,15 +301,14 @@
             <label><input type="radio" name="gender" value="no_answer"><span data-i18n="genderNoAnswer"></span></label>
           </div>
         </div>
-        <label class="field">
+        <div class="field">
           <span data-i18n="cvLabel"></span>
-          <select id="colorvision">
-            <option value="" data-i18n="cvPlaceholder"></option>
-            <option value="yes" data-i18n="cvYes"></option>
-            <option value="no" data-i18n="cvNo"></option>
-            <option value="unsure" data-i18n="cvUnsure"></option>
-          </select>
-        </label>
+          <div class="radio-group" id="cv-group">
+            <label><input type="radio" name="colorvision" value="yes"><span data-i18n="cvYes"></span></label>
+            <label><input type="radio" name="colorvision" value="no" checked><span data-i18n="cvNo"></span></label>
+            <label><input type="radio" name="colorvision" value="unsure"><span data-i18n="cvUnsure"></span></label>
+          </div>
+        </div>
         <label class="check">
           <input type="checkbox" id="consent">
           <span data-i18n="consentCheck"></span>
@@ -368,6 +367,11 @@
       <p class="eyebrow" data-i18n="eyebrow"></p>
       <h1 data-i18n="mainTitle"></h1>
       <p data-i18n="main1"></p>
+      <p data-i18n="main2"></p>
+      <div class="demo vas-wrap" style="margin:18px 0 6px">
+        <div class="vas"><div class="line"></div><div class="end l"></div><div class="end r"></div></div>
+        <div class="anchors"><span data-i18n="coldLong"></span><span data-i18n="hotLong"></span></div>
+      </div>
       <div class="actions">
         <button type="button" id="btn-main" data-i18n="startMain"></button>
       </div>
@@ -437,9 +441,9 @@ const CONFIG = {
    ============================================================ */
 const I18N = {
   ja: {
-    eyebrow: "台湾 中興大学 ・ 日本 九州大学",
+    eyebrow: "日本 九州大学 ・ 台湾 中興大学",
     title: "色と温度の印象に関する調査",
-    consent1: "本調査は、色から受ける温度の印象を調べる研究の一環として行われます。所要時間は約5分です。画面に表示される色を見て、その色から感じる温度を線の上で答えていただきます。",
+    consent1: "本調査は、色から受ける温度の印象を調べる研究の一環として行われます。所要時間は約3分です。画面に表示される色を見て、その色から感じる温度を線の上で答えていただきます。",
     consent2: "回答は匿名で扱われ、研究目的にのみ使用されます。参加は任意であり、いつでもブラウザを閉じて中止できます。",
     ageLabel: "年齢",
     genderLabel: "性別",
@@ -447,26 +451,26 @@ const I18N = {
     genderFemale: "女性",
     genderNoAnswer: "無回答",
     cvLabel: "色の見分けにくさを感じることがありますか",
-    cvPlaceholder: "選択してください",
     cvYes: "はい",
     cvNo: "いいえ",
     cvUnsure: "わからない",
     consentCheck: "上記の説明を読み、調査への参加に同意します。",
     instrTitle: "回答のしかた",
     instr1: "画面の中央に色が表示されます。その色から感じる温度の印象を、下の線の上をクリック（タップ）して答えてください。",
-    instr2: "線の両端は、下に示す温度の感じ方を表します。線上のどこでも自由に選べ、選んだ後にドラッグして調整できます。",
-    instr3: "正解はありません。あまり考え込まず、直感でお答えください。まず、言葉で示された温度の感じ方を使って、目盛りの使い方に慣れていただきます。",
-    coldLong: "川の水や湧き水のように、はっきり冷たい",
-    hotLong: "少し熱めのお風呂のお湯のように、はっきり熱い",
+    instr2: "左端は想像できるかぎり最も冷たい状態、右端は最も熱い状態を表します。線上のどこでも自由に選べ、選んだ後にドラッグして調整できます。",
+    instr3: "正解はありません。あまり考え込まず、直感でお答えください。まず練習として、いくつかの水の温度がこの線のどのあたりに当たるかをお答えいただきます。",
+    coldLong: "想像できるかぎり最も冷たい",
+    hotLong: "想像できるかぎり最も熱い",
     cold: "とても冷たい",
     hot: "とても熱い",
-    probePrompt: "次の温度を思い浮かべてください",
+    probePrompt: "次の水に触れたときの温度を思い浮かべてください",
     ref_cold: "川の水・湧き水",
     ref_hot: "少し熱めのお風呂のお湯",
     ref_neutral: "触れても冷たくも熱くもない水",
     startPractice: "練習を始める",
     mainTitle: "本番を始めます",
-    main1: "練習は終了です。ここからは {n} 種類の色が順番に表示されます。同じ目盛りでお答えください。",
+    main1: "練習は終了です。ここからは {n} 種類の色が順番に表示されます。",
+    main2: "目盛りは先ほどとまったく同じです。左端は想像できるかぎり最も冷たい状態、右端は最も熱い状態を表します。それぞれの色を見て、その色から感じる温度がこの線のどのあたりに当たるかをお答えください。",
     startMain: "本番を始める",
     next: "次へ",
     counter: "{i} / {n}",
@@ -486,9 +490,9 @@ const I18N = {
     restart: "次の参加者を開始"
   },
   en: {
-    eyebrow: "National Chung Hsing University, Taiwan · Kyushu University, Japan",
+    eyebrow: "Kyushu University, Japan · National Chung Hsing University, Taiwan",
     title: "Color and Temperature Impression Survey",
-    consent1: "This survey is part of a study on the temperature impressions evoked by colors. It takes about 5 minutes. You will see a color on the screen and indicate, on a line, how warm or cold it feels to you.",
+    consent1: "This survey is part of a study on the temperature impressions evoked by colors. It takes about 3 minutes. You will see a color on the screen and indicate, on a line, how warm or cold it feels to you.",
     consent2: "Responses are anonymous and used only for research. Participation is voluntary; you may stop at any time by closing the browser.",
     ageLabel: "Age",
     genderLabel: "Gender",
@@ -496,26 +500,26 @@ const I18N = {
     genderFemale: "Female",
     genderNoAnswer: "Prefer not to answer",
     cvLabel: "Do you have any difficulty distinguishing colors?",
-    cvPlaceholder: "Please select",
     cvYes: "Yes",
     cvNo: "No",
     cvUnsure: "Not sure",
     consentCheck: "I have read the information above and agree to take part.",
     instrTitle: "How to respond",
     instr1: "A color will appear in the middle of the screen. Click (or tap) on the line below it to indicate the temperature impression you get from that color.",
-    instr2: "The two ends of the line stand for the sensations described below it. You can choose any point on the line and drag to adjust after clicking.",
-    instr3: "There are no right or wrong answers. Go with your first impression. To begin, you will rate a few described sensations so you get used to the scale.",
-    coldLong: "As cold as stream or spring water — clearly cold to the touch",
-    hotLong: "As hot as slightly-too-hot bath water — clearly hot",
+    instr2: "The left end means as cold as you can imagine, and the right end as hot as you can imagine. You can choose any point on the line and drag to adjust after clicking.",
+    instr3: "There are no right or wrong answers. Go with your first impression. To begin, you will place a few kinds of water on this line for practice.",
+    coldLong: "As cold as you can imagine",
+    hotLong: "As hot as you can imagine",
     cold: "Very cold",
     hot: "Very hot",
-    probePrompt: "Imagine how this feels",
+    probePrompt: "Imagine how this water feels to the touch",
     ref_cold: "Stream or spring water",
     ref_hot: "Slightly-too-hot bath water",
     ref_neutral: "Water that feels neither cold nor warm",
     startPractice: "Start practice",
     mainTitle: "Main session",
-    main1: "Practice is complete. You will now see {n} colors one at a time. Please answer on the same scale.",
+    main1: "Practice is complete. You will now see {n} colors, one at a time.",
+    main2: "The scale is exactly the same as before. The left end means as cold as you can imagine, and the right end as hot as you can imagine. Look at each color and mark where the temperature it gives you falls on this line.",
     startMain: "Start",
     next: "Next",
     counter: "{i} / {n}",
@@ -537,7 +541,7 @@ const I18N = {
   "zh-Hant": {
     eyebrow: "台灣中興大學 ・ 日本九州大學",
     title: "顏色與溫度印象調查",
-    consent1: "本調查為探討顏色所引發之溫度印象的研究之一部分，全程約需5分鐘。畫面上會顯示一種顏色，請在線段上標示您覺得它有多冷或多熱。",
+    consent1: "本調查為探討顏色所引發之溫度印象的研究之一部分，全程約需3分鐘。畫面上會顯示一種顏色，請在線段上標示您覺得它有多冷或多熱。",
     consent2: "您的回答將以匿名方式處理，僅用於研究目的。參與完全自願，您可隨時關閉瀏覽器中止作答。",
     ageLabel: "年齡",
     genderLabel: "性別",
@@ -545,26 +549,26 @@ const I18N = {
     genderFemale: "女性",
     genderNoAnswer: "不願回答",
     cvLabel: "您是否有辨識顏色困難的情形？",
-    cvPlaceholder: "請選擇",
     cvYes: "是",
     cvNo: "否",
     cvUnsure: "不確定",
     consentCheck: "我已閱讀上述說明，並同意參與本調查。",
     instrTitle: "作答方式",
     instr1: "畫面中央會顯示一種顏色。請點擊（或輕觸）下方線段上的位置，表示這個顏色帶給您的溫度感受。",
-    instr2: "線段的兩端代表下方所描述的溫度感受。您可以選擇線段上任何一點，點選後也可拖曳調整。",
-    instr3: "沒有正確答案，請憑第一印象作答。開始之前，我們會先用文字描述的溫度感受，讓您熟悉這個量尺。",
-    coldLong: "像溪水或山泉水一樣，摸起來明顯覺得冷",
-    hotLong: "像偏熱的洗澡水，明顯覺得熱",
+    instr2: "最左端代表您能想像到最冷的程度，最右端代表最熱的程度。您可以選擇線段上任何一點，點選後也可拖曳調整。",
+    instr3: "沒有正確答案，請憑第一印象作答。開始之前，我們會先請您把幾種水標示在這條線上，作為練習。",
+    coldLong: "您能想像到最冷的程度",
+    hotLong: "您能想像到最熱的程度",
     cold: "非常冷",
     hot: "非常熱",
-    probePrompt: "請想像以下的溫度感受",
+    probePrompt: "請想像用手觸摸以下的水",
     ref_cold: "溪水、山泉水",
     ref_hot: "偏熱的洗澡水",
     ref_neutral: "摸起來不冷不熱的水",
     startPractice: "開始練習",
     mainTitle: "正式作答",
-    main1: "練習結束。接下來會依序出現 {n} 種顏色，請用同樣的量尺作答。",
+    main1: "練習結束。接下來會依序出現 {n} 種顏色。",
+    main2: "量尺和剛才完全相同：最左端代表您能想像到最冷的程度，最右端代表最熱的程度。請看著每個顏色，感受它帶給您的溫度，並標示在這條線上對應的位置。",
     startMain: "開始",
     next: "下一題",
     counter: "{i} / {n}",
@@ -908,17 +912,15 @@ document.addEventListener("keydown", (e) => {
 function updateConsentGate() {
   const ageOk = $("age").value.trim() !== "";
   const genderOk = !!document.querySelector('input[name="gender"]:checked');
-  const cvOk = $("colorvision").value !== "";
-  $("btn-consent").disabled = !($("consent").checked && ageOk && genderOk && cvOk);
+  $("btn-consent").disabled = !($("consent").checked && ageOk && genderOk);
 }
 $("consent").addEventListener("change", updateConsentGate);
-$("colorvision").addEventListener("change", updateConsentGate);
 $("age").addEventListener("input", updateConsentGate);
 document.querySelectorAll('input[name="gender"]').forEach(r => r.addEventListener("change", updateConsentGate));
 $("btn-consent").addEventListener("click", () => {
   session.age = $("age").value.trim();
   session.gender = (document.querySelector('input[name="gender"]:checked') || {}).value || "";
-  session.colorVision = $("colorvision").value;
+  session.colorVision = (document.querySelector('input[name="colorvision"]:checked') || {}).value || "";
   show("s-instr");
 });
 $("btn-start").addEventListener("click", async () => {
