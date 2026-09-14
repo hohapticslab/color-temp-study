@@ -298,6 +298,7 @@
           <div class="radio-group" id="gender-group">
             <label><input type="radio" name="gender" value="male"><span data-i18n="genderMale"></span></label>
             <label><input type="radio" name="gender" value="female"><span data-i18n="genderFemale"></span></label>
+            <label><input type="radio" name="gender" value="other"><span data-i18n="genderOther"></span></label>
             <label><input type="radio" name="gender" value="no_answer"><span data-i18n="genderNoAnswer"></span></label>
           </div>
         </div>
@@ -378,6 +379,19 @@
     </div>
   </section>
 
+  <!-- 4c. Intermission between the two blocks -->
+  <section class="screen" id="s-break">
+    <div class="panel">
+      <p class="eyebrow" data-i18n="eyebrow"></p>
+      <h1 data-i18n="breakTitle"></h1>
+      <p data-i18n="break1"></p>
+      <p data-i18n="break2"></p>
+      <div class="actions">
+        <button type="button" id="btn-break" data-i18n="breakContinue"></button>
+      </div>
+    </div>
+  </section>
+
   <!-- 5. Done -->
   <section class="screen" id="s-done">
     <div class="panel">
@@ -419,21 +433,52 @@ const CONFIG = {
   // participant's use of the scale and give per-person landmarks in the data.
   // Recorded with practice=1 and trial_type="referent".
   REFERENTS: ["ref_cold", "ref_hot", "ref_neutral"],
-  // 12 CIELCh hues, constant L* = 70, maximum in-gamut chroma per hue
-  COLORS: [
-    { name: "h040", hue: 40,  L: 70, C: 104.6, rgb: [255, 0, 0] },
-    { name: "h070", hue: 70,  L: 70, C: 97.5,  rgb: [255, 184, 0] },
-    { name: "h100", hue: 100, L: 70, C: 104.0, rgb: [132, 255, 0] },
-    { name: "h130", hue: 130, L: 70, C: 91.7,  rgb: [0, 255, 84] },
-    { name: "h160", hue: 160, L: 70, C: 84.0,  rgb: [0, 255, 184] },
-    { name: "h190", hue: 190, L: 70, C: 80.7,  rgb: [0, 228, 255] },
-    { name: "h220", hue: 220, L: 70, C: 92.8,  rgb: [0, 140, 255] },
-    { name: "h250", hue: 250, L: 70, C: 97.6,  rgb: [0, 60, 255] },
-    { name: "h280", hue: 280, L: 70, C: 93.1,  rgb: [136, 0, 255] },
-    { name: "h310", hue: 310, L: 70, C: 90.5,  rgb: [255, 0, 184] },
-    { name: "h340", hue: 340, L: 70, C: 87.1,  rgb: [255, 0, 88] },
-    { name: "h010", hue: 10,  L: 70, C: 99.4,  rgb: [255, 48, 0] }
-  ]
+  // A fourth practice trial: one colour, so the first recorded colour is not also
+  // the participant's first ever colour judgement. Deliberately a green that is
+  // in NEITHER stimulus set (mid-lightness, h 145 deg), so no test colour is
+  // pre-exposed. Recorded with practice=1 and trial_type="color".
+  PRACTICE_COLOR: { name: "practice_green", zh: "", cmy: "", hue: 145.0, L: 65.1, C: 65.3, rgb: [58, 180, 87] },
+  // Both sets run in one session as two blocks. The order is randomised per
+  // participant unless RANDOMIZE_BLOCK_ORDER is false.
+  BLOCK_ORDER: ["chao", "cielch"],
+  RANDOMIZE_BLOCK_ORDER: true,
+  SETS: {
+    // Run 1 — Dr. Chao's educational hue circle. RGB taken from the colour-wheel
+    // figure she uses (warm swatches are R255; the figure's "R225" labels are a typo,
+    // confirmed by sampling the image). The CMY string is her nominal ink recipe —
+    // note the cool half does NOT equal a naive CMY->RGB conversion of it.
+    // L*, C*, h are measured from the RGB below.
+    chao: [
+      { name: "chao_yellow", zh: "黃", cmy: "C0M0Y100", hue: 102.9, L: 97.1, C: 96.9, rgb: [255, 255, 0] },
+      { name: "chao_yellow_orange", zh: "黃橙", cmy: "C0M25Y100", hue: 82.5, L: 80.8, C: 83.6, rgb: [255, 190, 0] },
+      { name: "chao_orange", zh: "橙", cmy: "C0M50Y100", hue: 59.9, L: 67.1, C: 85.5, rgb: [255, 128, 0] },
+      { name: "chao_red_orange", zh: "紅橙", cmy: "C0M75Y100", hue: 44.7, L: 57.0, C: 97.6, rgb: [255, 64, 0] },
+      { name: "chao_red", zh: "紅", cmy: "C0M100Y100", hue: 40.0, L: 53.2, C: 104.6, rgb: [255, 0, 0] },
+      { name: "chao_red_purple", zh: "紅紫", cmy: "C25M100Y0", hue: 346.4, L: 41.0, C: 71.3, rgb: [185, 3, 126] },
+      { name: "chao_purple", zh: "紫", cmy: "C50M100Y0", hue: 329.4, L: 30.1, C: 68.1, rgb: [130, 2, 126] },
+      { name: "chao_blue_purple", zh: "藍紫", cmy: "C75M100Y0", hue: 314.5, L: 19.9, C: 71.7, rgb: [74, 1, 125] },
+      { name: "chao_blue", zh: "藍", cmy: "C100M100Y0", hue: 307.0, L: 13.3, C: 77.0, rgb: [19, 1, 124] },
+      { name: "chao_blue_green", zh: "藍綠", cmy: "C100M50Y50", hue: 236.2, L: 28.7, C: 20.8, rgb: [5, 74, 94] },
+      { name: "chao_green", zh: "綠", cmy: "C100M0Y100", hue: 145.4, L: 49.4, C: 60.3, rgb: [1, 136, 55] },
+      { name: "chao_yellow_green", zh: "黃綠", cmy: "C50M0Y100", hue: 123.3, L: 72.3, C: 81.5, rgb: [128, 196, 28] }
+    ],
+    // Run 2 — even 30 deg CIELCh steps anchored so that red falls at h=40
+    // (h=40 at maximum sRGB chroma is exactly pure red). Max chroma at each hue.
+    cielch: [
+      { name: "h010", zh: "", cmy: "", hue: 10, L: 54.5, C: 84.4, rgb: [255, 3, 110] },
+      { name: "h040", zh: "", cmy: "", hue: 40, L: 53.2, C: 104.6, rgb: [255, 0, 0] },
+      { name: "h070", zh: "", cmy: "", hue: 70, L: 72.9, C: 82.7, rgb: [255, 156, 0] },
+      { name: "h100", zh: "", cmy: "", hue: 100, L: 94.0, C: 93.5, rgb: [254, 243, 0] },
+      { name: "h130", zh: "", cmy: "", hue: 130, L: 89.1, C: 110.9, rgb: [114, 254, 0] },
+      { name: "h160", zh: "", cmy: "", hue: 160, L: 88.9, C: 72.3, rgb: [0, 254, 174] },
+      { name: "h190", zh: "", cmy: "", hue: 190, L: 90.8, C: 52.0, rgb: [0, 255, 244] },
+      { name: "h220", zh: "", cmy: "", hue: 220, L: 81.8, C: 43.9, rgb: [0, 223, 255] },
+      { name: "h250", zh: "", cmy: "", hue: 250, L: 71.3, C: 46.7, rgb: [0, 187, 254] },
+      { name: "h280", zh: "", cmy: "", hue: 280, L: 58.0, C: 66.6, rgb: [4, 140, 255] },
+      { name: "h310", zh: "", cmy: "", hue: 310, L: 38.5, C: 127.1, rgb: [107, 1, 255] },
+      { name: "h340", zh: "", cmy: "", hue: 340, L: 57.2, C: 96.6, rgb: [254, 0, 197] }
+    ]
+  }
 };
 
 /* ============================================================
@@ -443,12 +488,13 @@ const I18N = {
   ja: {
     eyebrow: "日本 九州大学 ・ 台湾 中興大学",
     title: "色と温度の印象に関する調査",
-    consent1: "本調査は、色から受ける温度の印象を調べる研究の一環として行われます。所要時間は約3分です。画面に表示される色を見て、その色から感じる温度を線の上で答えていただきます。",
+    consent1: "本調査は、色から受ける温度の印象を調べる研究の一環として行われます。所要時間は約5分です。画面に表示される色を見て、その色から感じる温度を線の上で答えていただきます。",
     consent2: "回答は匿名で扱われ、研究目的にのみ使用されます。参加は任意であり、いつでもブラウザを閉じて中止できます。",
     ageLabel: "年齢",
     genderLabel: "性別",
     genderMale: "男性",
     genderFemale: "女性",
+    genderOther: "その他",
     genderNoAnswer: "無回答",
     cvLabel: "色の見分けにくさを感じることがありますか",
     cvYes: "はい",
@@ -458,18 +504,22 @@ const I18N = {
     instrTitle: "回答のしかた",
     instr1: "画面の中央に色が表示されます。その色から感じる温度の印象を、下の線の上をクリック（タップ）して答えてください。",
     instr2: "左端は想像できるかぎり最も冷たい状態、右端は最も熱い状態を表します。線上のどこでも自由に選べ、選んだ後にドラッグして調整できます。",
-    instr3: "正解はありません。あまり考え込まず、直感でお答えください。まず練習として、いくつかの水の温度がこの線のどのあたりに当たるかをお答えいただきます。",
+    instr3: "正解はありません。あまり考え込まず、直感でお答えください。まず練習として、日常の場面で手に感じる温度と、色を一つ、この線の上でお答えいただきます。",
     coldLong: "想像できるかぎり最も冷たい",
     hotLong: "想像できるかぎり最も熱い",
     cold: "とても冷たい",
     hot: "とても熱い",
-    probePrompt: "次の水に触れたときの温度を思い浮かべてください",
-    ref_cold: "ひんやり冷たい川の水・湧き水",
-    ref_hot: "熱めの温泉",
-    ref_neutral: "触れても冷たくも熱くもない水",
+    probePrompt: "次のときに手に感じる温度を思い浮かべてください",
+    ref_cold: "冷たい飲み物を手に持ったときの、ひんやりした感じ",
+    ref_hot: "熱いコーヒーを手に持ったときの、温かい感じ",
+    ref_neutral: "自分のもう一方の手に触れたときの、温度の感じ",
     startPractice: "練習を始める",
     mainTitle: "本番を始めます",
-    main1: "練習は終了です。ここからは {n} 種類の色が順番に表示されます。",
+    main1: "練習は終了です。ここからは色を {sets} 組、各 {per} 種類、全部で {total} 試行お答えいただきます。組と組の間に休憩があります。",
+    breakTitle: "少し休憩しましょう",
+    break1: "1 組目が終わりました。全体の半分です。",
+    break2: "少し目を休めていただいて構いません。準備ができましたら、下のボタンを押して続けてください。目盛りの使い方はこれまでと同じです。",
+    breakContinue: "続ける",
     main2: "目盛りは先ほどとまったく同じです。左端は想像できるかぎり最も冷たい状態、右端は最も熱い状態を表します。それぞれの色を見て、その色から感じる温度がこの線のどのあたりに当たるかをお答えください。",
     startMain: "本番を始める",
     next: "次へ",
@@ -492,12 +542,13 @@ const I18N = {
   en: {
     eyebrow: "Kyushu University, Japan · National Chung Hsing University, Taiwan",
     title: "Color and Temperature Impression Survey",
-    consent1: "This survey is part of a study on the temperature impressions evoked by colors. It takes about 3 minutes. You will see a color on the screen and indicate, on a line, how warm or cold it feels to you.",
+    consent1: "This survey is part of a study on the temperature impressions evoked by colors. It takes about 5 minutes. You will see a color on the screen and indicate, on a line, how warm or cold it feels to you.",
     consent2: "Responses are anonymous and used only for research. Participation is voluntary; you may stop at any time by closing the browser.",
     ageLabel: "Age",
     genderLabel: "Gender",
     genderMale: "Male",
     genderFemale: "Female",
+    genderOther: "Other",
     genderNoAnswer: "Prefer not to answer",
     cvLabel: "Do you have any difficulty distinguishing colors?",
     cvYes: "Yes",
@@ -507,18 +558,22 @@ const I18N = {
     instrTitle: "How to respond",
     instr1: "A color will appear in the middle of the screen. Click (or tap) on the line below it to indicate the temperature impression you get from that color.",
     instr2: "The left end means as cold as you can imagine, and the right end as hot as you can imagine. You can choose any point on the line and drag to adjust after clicking.",
-    instr3: "There are no right or wrong answers. Go with your first impression. To begin, you will place a few kinds of water on this line for practice.",
+    instr3: "There are no right or wrong answers. Go with your first impression. For practice, you will first place a few everyday sensations, and then one colour, on this line.",
     coldLong: "As cold as you can imagine",
     hotLong: "As hot as you can imagine",
     cold: "Very cold",
     hot: "Very hot",
-    probePrompt: "Imagine how this water feels to the touch",
-    ref_cold: "Cold stream or spring water",
-    ref_hot: "Bath water that is hot to the touch",
-    ref_neutral: "Water that feels neither cold nor warm",
+    probePrompt: "Imagine what your hand feels in this situation",
+    ref_cold: "The coolness of holding a cold drink",
+    ref_hot: "The warmth of holding a hot cup of coffee",
+    ref_neutral: "The temperature you feel when you touch your own other hand",
     startPractice: "Start practice",
     mainTitle: "Main session",
-    main1: "Practice is complete. You will now see {n} colors, one at a time.",
+    main1: "Practice is complete. You will now rate {sets} sets of colors, {per} in each, {total} trials in total. There is a break between the two sets.",
+    breakTitle: "Take a break",
+    break1: "That is the first set finished — you are halfway through.",
+    break2: "Feel free to rest your eyes for a moment. Press the button below when you are ready to continue. The scale works exactly as before.",
+    breakContinue: "Continue",
     main2: "The scale is exactly the same as before. The left end means as cold as you can imagine, and the right end as hot as you can imagine. Look at each color and mark where the temperature it gives you falls on this line.",
     startMain: "Start",
     next: "Next",
@@ -539,16 +594,17 @@ const I18N = {
     restart: "New participant"
   },
   "zh-Hant": {
-    eyebrow: "台灣中興大學 ・ 日本九州大學",
+    eyebrow: "臺灣中興大學 ・ 日本九州大學",
     title: "顏色與溫度印象調查",
-    consent1: "本調查為探討顏色所引發之溫度印象的研究之一部分，全程約需3分鐘。畫面上會顯示一種顏色，請在線段上標示您覺得它有多冷或多熱。",
+    consent1: "本調查為探討顏色所引發之溫度印象的研究之一部分，全程約需5分鐘。畫面上會顯示一種顏色，請在線段上標示您覺得它有多冷或多熱。",
     consent2: "您的回答將以匿名方式處理，僅用於研究目的。參與完全自願，您可隨時關閉瀏覽器中止作答。",
     ageLabel: "年齡",
     genderLabel: "性別",
     genderMale: "男性",
     genderFemale: "女性",
-    genderNoAnswer: "不願回答",
-    cvLabel: "您是否有辨識顏色困難的情形？",
+    genderOther: "其它",
+    genderNoAnswer: "不願透漏",
+    cvLabel: "請問您是否有色彩辨識困難？",
     cvYes: "是",
     cvNo: "否",
     cvUnsure: "不確定",
@@ -556,18 +612,22 @@ const I18N = {
     instrTitle: "作答方式",
     instr1: "畫面中央會顯示一種顏色。請點擊（或輕觸）下方線段上的位置，表示這個顏色帶給您的溫度感受。",
     instr2: "最左端代表您能想像到最冷的程度，最右端代表最熱的程度。您可以選擇線段上任何一點，點選後也可拖曳調整。",
-    instr3: "沒有正確答案，請憑第一印象作答。開始之前，我們會先請您把幾種水標示在這條線上，作為練習。",
+    instr3: "沒有正確答案，請憑第一印象作答。開始之前，我們會先請您把幾種日常的溫度感覺、以及一個顏色，標示在這條線上，作為練習。",
     coldLong: "您能想像到最冷的程度",
     hotLong: "您能想像到最熱的程度",
     cold: "非常冷",
     hot: "非常熱",
-    probePrompt: "請想像用手觸摸以下的水",
-    ref_cold: "冰涼的溪水、山泉水",
-    ref_hot: "燙手的洗澡水",
-    ref_neutral: "摸起來不冷不熱的水",
+    probePrompt: "請想像在以下情況中，手所感受到的溫度",
+    ref_cold: "手拿冰飲料的冰涼感",
+    ref_hot: "手拿熱咖啡的溫熱感",
+    ref_neutral: "摸自己另外一隻手時的溫度感覺",
     startPractice: "開始練習",
     mainTitle: "正式作答",
-    main1: "練習結束。接下來會依序出現 {n} 種顏色。",
+    main1: "練習結束。接下來會有 {sets} 組顏色，每組 {per} 種，共 {total} 題；兩組之間會有一次休息。",
+    breakTitle: "休息一下",
+    break1: "第一組結束了，您已經完成一半。",
+    break2: "可以先讓眼睛休息一下，準備好之後再按下方按鈕繼續。量尺的使用方式和前面完全相同。",
+    breakContinue: "繼續作答",
     main2: "量尺和剛才完全相同：最左端代表您能想像到最冷的程度，最右端代表最熱的程度。請看著每個顏色，感受它帶給您的溫度，並標示在這條線上對應的位置。",
     startMain: "開始",
     next: "下一題",
@@ -612,6 +672,7 @@ let trials = [];       // sequence of {color, practice, rep}
 let idx = 0;
 let cur = null;        // current trial timing/response
 let mainStarted = false;
+let blockOrder = [];
 const pending = [];    // in-flight trial uploads
 let sendFailures = 0;
 let trialTimer = null;
@@ -661,16 +722,25 @@ function show(id) {
 /* ---------- sequence ---------- */
 function buildSequence() {
   const seq = [];
-  CONFIG.REFERENTS.forEach(key => seq.push({ kind: "referent", key, practice: 1, rep: 0 }));
-  let prev = null;
-  for (let r = 1; r <= CONFIG.REPS; r++) {
-    let block;
-    do {
-      block = shuffle(CONFIG.COLORS.slice());
-    } while (prev && block[0].name === prev.name && CONFIG.COLORS.length > 1);
-    block.forEach(c => seq.push({ kind: "color", color: c, practice: 0, rep: r }));
-    prev = block[block.length - 1];
+  CONFIG.REFERENTS.forEach(key => seq.push({ kind: "referent", key, practice: 1, rep: 0, block: 0, set: "" }));
+  if (CONFIG.PRACTICE_COLOR) {
+    seq.push({ kind: "color", color: CONFIG.PRACTICE_COLOR, practice: 1, rep: 0, block: 0, set: "practice" });
   }
+  blockOrder = CONFIG.BLOCK_ORDER.slice();
+  if (CONFIG.RANDOMIZE_BLOCK_ORDER) shuffle(blockOrder);
+  blockOrder.forEach((setName, bi) => {
+    const colors = CONFIG.SETS[setName];
+    let prev = null;
+    for (let r = 1; r <= CONFIG.REPS; r++) {
+      let blk;
+      do {
+        blk = shuffle(colors.slice());
+      } while (prev && blk[0].name === prev.name && colors.length > 1);
+      blk.forEach(c => seq.push({ kind: "color", color: c, practice: 0, rep: r,
+                                 block: bi + 1, set: setName }));
+      prev = blk[blk.length - 1];
+    }
+  });
   return seq;
 }
 function shuffle(a) {
@@ -770,9 +840,11 @@ function startTrial() {
     }
   }, CONFIG.ISI_MS);
 }
-let mainIntroCount = 0;
 function renderMainIntroText() {
-  $("s-main-intro").querySelector("[data-i18n='main1']").textContent = fmt(T.main1, { n: mainIntroCount });
+  const total = trials.filter(x => !x.practice).length;
+  const sets = blockOrder.length || 1;
+  $("s-main-intro").querySelector("[data-i18n='main1']").textContent =
+    fmt(T.main1, { sets: sets, per: Math.round(total / sets), total: total });
 }
 function endTrial() {
   clearTimeout(trialTimer); trialTimer = null;
@@ -788,11 +860,15 @@ function endTrial() {
     gender: session.gender,
     color_vision_difficulty: session.colorVision,
     lang,
+    color_set: isColor ? t.set : "",
+    block: isColor ? t.block : "",
+    block_order: blockOrder.join("|"),
     practice: t.practice,
     trial_type: isColor ? "color" : "referent",
     trial: idx + 1,
     rep: t.rep,
     color_name: isColor ? c.name : t.key,
+    cmy: isColor ? c.cmy : "",
     hue_deg: isColor && c.hue != null ? c.hue : "",
     L_star: isColor ? c.L : "", C_star: isColor ? c.C : "",
     r: isColor ? c.rgb[0] : "", g: isColor ? c.rgb[1] : "", b: isColor ? c.rgb[2] : "",
@@ -807,15 +883,17 @@ function endTrial() {
   });
   sendTrial(session.rows[session.rows.length - 1]);
   idx++;
-  if (idx < trials.length && !trials[idx].practice && !mainStarted) {
+  if (idx >= trials.length) { finish(); return; }
+  const next = trials[idx], done = trials[idx - 1];
+  if (!next.practice && !mainStarted) {
     mainStarted = true;
-    mainIntroCount = trials.filter(x => !x.practice).length;
     renderMainIntroText();
     show("s-main-intro");
-  } else if (idx < trials.length) {
-    startTrial();
+  } else if (!next.practice && !done.practice && next.kind === "color" &&
+             done.kind === "color" && next.block !== done.block) {
+    show("s-break");
   } else {
-    finish();
+    startTrial();
   }
 }
 
@@ -928,11 +1006,14 @@ $("btn-start").addEventListener("click", async () => {
   btn.disabled = true;
   btn.textContent = T.preparing;
   session.device = deviceInfo();
+  trials = buildSequence();
+  idx = 0;
   if (CONFIG.ENDPOINT_URL) {
     try {
       const j = await post({ action: "register", study_id: CONFIG.STUDY_ID, session_id: session.id,
                              participant_id: session.pid, age: session.age, gender: session.gender,
                              color_vision_difficulty: session.colorVision,
+                             block_order: blockOrder.join("|"),
                              lang, device: session.device });
       if (j && j.ok && j.subject_code) session.subject = j.subject_code;
     } catch (e) { /* no code: page continues, data still downloadable */ }
@@ -940,11 +1021,10 @@ $("btn-start").addEventListener("click", async () => {
   }
   btn.disabled = false;
   btn.textContent = T.startPractice;
-  trials = buildSequence();
-  idx = 0;
   startTrial();
 });
 $("btn-main").addEventListener("click", startTrial);
+$("btn-break").addEventListener("click", startTrial);
 $("btn-restart").addEventListener("click", () => location.reload());
 $("btn-next").addEventListener("click", () => { if (cur && cur.vas != null) endTrial(); });
 </script>
