@@ -197,7 +197,7 @@
   }
   .probe-prompt {
     font-size: 13px; font-weight: 400; color: var(--ink-faint);
-    letter-spacing: 0.02em;
+    letter-spacing: 0.02em; white-space: pre-line;   /* honours \n in probePrompt */
   }
   .probe-text {
     font-size: clamp(19px, 3.4vmin, 26px); font-weight: 600;
@@ -226,6 +226,14 @@
     display: none;
   }
   .vas.answered .marker { display: block; }
+  /* Optional landmark ticks. Deliberately short, thin and low-contrast: they are
+     memory pegs, not response categories. Response stays continuous (0.1). */
+  .vas .tick {
+    position: absolute; top: 50%; width: 1px; height: 11px;
+    background: var(--line); opacity: 0.38;
+    transform: translate(-50%, -50%);
+  }
+  .field .hint { font-size: 12px; color: var(--ink-soft); font-weight: 400; margin-top: 4px; display: block; }
   .anchors {
     display: flex; justify-content: space-between; gap: 20px;
     font-size: 13px; font-weight: 600; color: #1b1b1b;
@@ -243,7 +251,8 @@
   .demo .vas { cursor: default; height: 44px; }
   .demo .vas .marker { display: block; left: 50%; opacity: 0.35; }
 
-  .status { font-family: var(--mono); font-size: 14px; color: var(--ink-soft); }
+  .status { font-size: 19px; font-weight: 600; line-height: 1.45; color: var(--ink); }
+  @media (max-width: 520px) { .status { font-size: 17px; } }
   .code {
     font: 500 22px var(--mono); letter-spacing: 0.12em;
     background: #fff; border: 1px solid var(--panel-edge);
@@ -310,6 +319,11 @@
             <label><input type="radio" name="colorvision" value="unsure"><span data-i18n="cvUnsure"></span></label>
           </div>
         </div>
+        <label class="field">
+          <span data-i18n="skinTempLabel"></span>
+          <input type="number" id="skin-temp" inputmode="decimal" min="10" max="45" step="0.1" autocomplete="off" placeholder="—">
+          <small class="hint" data-i18n="skinTempHint"></small>
+        </label>
         <label class="check">
           <input type="checkbox" id="consent">
           <span data-i18n="consentCheck"></span>
@@ -428,16 +442,48 @@ const CONFIG = {
   ENDPOINT_URL: "https://script.google.com/macros/s/AKfycbxLdmTyOn5jF70sgHw4hiFL2F9Tnx5V8OXkSbkH04JnSCA9nLdAEiU-Y8WiX4B7vmzQEA/exec",
   REPS: 1,                 // repetitions of each color (1 = each color shown once)
   ISI_MS: 500,             // blank grey between trials
+  // Faint unlabelled landmarks on the line, as percentages. [] = none.
+  // They help participants keep their own use of the scale stable across trials;
+  // the response itself stays continuous. Logged in the vas_ticks column.
+  VAS_TICKS: [25, 50, 75],
   TRIAL_TIMEOUT_MS: 0,     // 0 = no time limit; set e.g. 60000 for a 60 s limit
-  // Practice = rating described thermal experiences, not colors. These set the
-  // participant's use of the scale and give per-person landmarks in the data.
-  // Recorded with practice=1 and trial_type="referent".
-  REFERENTS: ["ref_cold", "ref_hot", "ref_neutral"],
-  // A fourth practice trial: one colour, so the first recorded colour is not also
-  // the participant's first ever colour judgement. Deliberately a green that is
-  // in NEITHER stimulus set (mid-lightness, h 145 deg), so no test colour is
-  // pre-exposed. Recorded with practice=1 and trial_type="color".
-  PRACTICE_COLOR: { name: "practice_green", zh: "", cmy: "", hue: 145.0, L: 65.1, C: 65.3, rgb: [58, 180, 87] },
+  // Practice = rating PHYSICAL thermal stimuli on the plates at the booth, not
+  // colors. These set the participant's use of the scale and give per-person
+  // landmarks measured in real degrees. Recorded with practice=1 and
+  // trial_type="referent"; temp_c holds the plate's set temperature.
+  // The screen never shows the temperature — only the plate label — so that
+  // participants judge the sensation rather than doing arithmetic on the scale.
+  // Keep `label` identical to the physical marking on each plate.
+  // One Peltier hot/cold plate, re-set by staff between touches. FIXED order
+  // 30 -> 15 -> 45: the 30 degC reading is taken with the hand at rest (it is the
+  // point closest to skin temperature and so the most vulnerable to adaptation),
+  // and the sequence ends warm, because cold after-effects outlast warm ones.
+  // 30 is also the exact midpoint of 15 and 45, which makes its rating a free
+  // test of whether the VAS is linear in degrees.
+  REFERENTS: [
+    { key: "ref_mid",  step: 1, temp_c: 30 },
+    { key: "ref_cold", step: 2, temp_c: 15 },
+    { key: "ref_hot",  step: 3, temp_c: 45 }
+  ],
+  // Touches are brief, so no enforced recovery interval. Set >0 to reinstate it.
+  REFERENT_REST_S: 0,
+  // --- network ---
+  // Several tablets share ONE Apps Script lock, so what matters is the number of
+  // requests, not their size. Trials are therefore buffered and uploaded in
+  // batches: ~8 requests per participant instead of 30. Failed flushes are never
+  // retried in-session - the rows simply stay in the buffer and go out with the
+  // next flush, which is self-healing and cannot pile up.
+  NET: {
+    FLUSH_EVERY: 6,        // upload once this many rows are waiting (1 = per trial)
+    REGISTER_MS: 30000,    // background; the participant is reading meanwhile
+    BATCH_MS: 30000,       // background; nobody waits on these
+    FINISH_MS: 20000,
+    ATTEMPTS: 3,           // registration only
+    START_WAIT_MS: 6000,   // extra wait at "start practice" if registration is slow
+    DRAIN_MS: 15000,       // cap on waiting for an in-flight flush at the end
+    TAIL_MS: 30000         // hard cap on the whole end-of-session send
+  },
+  // No practice colour: the three plate ratings already teach the scale.
   // Both sets run in one session as two blocks. The order is randomised per
   // participant unless RANDOMIZE_BLOCK_ORDER is false.
   BLOCK_ORDER: ["chao", "cielch"],
@@ -463,20 +509,28 @@ const CONFIG = {
       { name: "chao_yellow_green", zh: "黃綠", cmy: "C50M0Y100", hue: 123.3, L: 72.3, C: 81.5, rgb: [128, 196, 28] }
     ],
     // Run 2 — even 30 deg CIELCh steps anchored so that red falls at h=40
-    // (h=40 at maximum sRGB chroma is exactly pure red). Max chroma at each hue.
+    // (h=40 at maximum sRGB chroma is exactly pure red). Max chroma at each hue,
+    // but capped at L* 80: at maximum chroma the yellow/green/cyan region sits at
+    // L* 89-94 and reads as fluorescent. Followed by four lightness partners.
     cielch: [
-      { name: "h010", zh: "", cmy: "", hue: 10, L: 54.5, C: 84.4, rgb: [255, 3, 110] },
-      { name: "h040", zh: "", cmy: "", hue: 40, L: 53.2, C: 104.6, rgb: [255, 0, 0] },
-      { name: "h070", zh: "", cmy: "", hue: 70, L: 72.9, C: 82.7, rgb: [255, 156, 0] },
-      { name: "h100", zh: "", cmy: "", hue: 100, L: 94.0, C: 93.5, rgb: [254, 243, 0] },
-      { name: "h130", zh: "", cmy: "", hue: 130, L: 89.1, C: 110.9, rgb: [114, 254, 0] },
-      { name: "h160", zh: "", cmy: "", hue: 160, L: 88.9, C: 72.3, rgb: [0, 254, 174] },
-      { name: "h190", zh: "", cmy: "", hue: 190, L: 90.8, C: 52.0, rgb: [0, 255, 244] },
-      { name: "h220", zh: "", cmy: "", hue: 220, L: 81.8, C: 43.9, rgb: [0, 223, 255] },
-      { name: "h250", zh: "", cmy: "", hue: 250, L: 71.3, C: 46.7, rgb: [0, 187, 254] },
-      { name: "h280", zh: "", cmy: "", hue: 280, L: 58.0, C: 66.6, rgb: [4, 140, 255] },
-      { name: "h310", zh: "", cmy: "", hue: 310, L: 38.5, C: 127.1, rgb: [107, 1, 255] },
-      { name: "h340", zh: "", cmy: "", hue: 340, L: 57.2, C: 96.6, rgb: [254, 0, 197] }
+      { name: "h010", zh: "", cmy: "", hue: 9.8, L: 54.5, C: 84.4, rgb: [255, 3, 110] },
+      { name: "h040", zh: "", cmy: "", hue: 40.0, L: 53.2, C: 104.6, rgb: [255, 0, 0] },
+      { name: "h070", zh: "", cmy: "", hue: 69.8, L: 72.9, C: 82.7, rgb: [255, 156, 0] },
+      { name: "h100", zh: "", cmy: "", hue: 100.1, L: 80.0, C: 81.7, rgb: [212, 203, 0] },
+      { name: "h130", zh: "", cmy: "", hue: 130.0, L: 79.9, C: 101.2, rgb: [100, 225, 0] },
+      { name: "h160", zh: "", cmy: "", hue: 160.1, L: 80.0, C: 66.3, rgb: [0, 226, 154] },
+      { name: "h190", zh: "", cmy: "", hue: 190.3, L: 79.9, C: 46.5, rgb: [0, 221, 212] },
+      { name: "h220", zh: "", cmy: "", hue: 220.6, L: 79.9, C: 43.0, rgb: [0, 217, 249] },
+      { name: "h250", zh: "", cmy: "", hue: 250.1, L: 71.3, C: 46.7, rgb: [0, 187, 254] },
+      { name: "h280", zh: "", cmy: "", hue: 279.9, L: 58.0, C: 66.6, rgb: [4, 140, 255] },
+      { name: "h310", zh: "", cmy: "", hue: 310.0, L: 38.5, C: 127.1, rgb: [107, 1, 255] },
+      { name: "h340", zh: "", cmy: "", hue: 340.0, L: 57.2, C: 96.6, rgb: [254, 0, 197] },
+      // Lightness partners: same hue as the stimulus above, about 32 L* units away.
+      // These four pairs are what separate hue from lightness within this set alone.
+      { name: "p130", zh: "", cmy: "", hue: 129.9, L: 48.0, C: 67.4, rgb: [55, 130, 0] },
+      { name: "p160", zh: "", cmy: "", hue: 159.8, L: 48.2, C: 44.5, rgb: [0, 131, 87] },
+      { name: "p190", zh: "", cmy: "", hue: 189.6, L: 48.1, C: 31.2, rgb: [0, 128, 122] },
+      { name: "p310", zh: "", cmy: "", hue: 310.0, L: 70.0, C: 60.0, rgb: [198, 149, 255] }
     ]
   }
 };
@@ -504,20 +558,21 @@ const I18N = {
     instrTitle: "回答のしかた",
     instr1: "画面の中央に色が表示されます。その色から感じる温度の印象を、下の線の上をクリック（タップ）して答えてください。",
     instr2: "左端は想像できるかぎり最も冷たい状態、右端は最も熱い状態を表します。線上のどこでも自由に選べ、選んだ後にドラッグして調整できます。",
-    instr3: "正解はありません。あまり考え込まず、直感でお答えください。まず練習として、日常の場面で手に感じる温度と、色を一つ、この線の上でお答えいただきます。",
+    instr3: "正解はありません。あまり考え込まず、直感でお答えください。まず練習として、机の上のプレートに 3 回（毎回スタッフが温度を変えます）軽く触れ、感じた温度をこの線の上でお答えいただきます。",
     coldLong: "想像できるかぎり最も冷たい",
     hotLong: "想像できるかぎり最も熱い",
     cold: "とても冷たい",
     hot: "とても熱い",
-    probePrompt: "次のときに手に感じる温度を思い浮かべてください",
-    ref_cold: "冷たい飲み物を手に持ったときの、ひんやりした感じ",
-    ref_hot: "熱いコーヒーを手に持ったときの、温かい感じ",
-    ref_neutral: "自分のもう一方の手に触れたときの、温度の感じ",
+    probePrompt: "プレートに指先で軽く触れ、\n感じた温度をお答えください",
+    refTouch: "{i} 回目の接触（全 {n} 回）",
+    restPrompt: "手の温度が戻るまで少しお待ちください（{s} 秒）",
+    skinTempLabel: "右手の人差し指の温度（\u00B0C）",
+    skinTempHint: "サーモカメラ画面の白いターゲット表示に出ている数値を入力してください",
     startPractice: "練習を始める",
     mainTitle: "本番を始めます",
-    main1: "練習は終了です。ここからは色を {sets} 組、各 {per} 種類、全部で {total} 試行お答えいただきます。組と組の間に休憩があります。",
+    main1: "練習は終了です。ここからは色を {sets} 組、全部で {total} 試行お答えいただきます。組と組の間に休憩があります。",
     breakTitle: "少し休憩しましょう",
-    break1: "1 組目が終わりました。全体の半分です。",
+    break1: "1 組目が終わりました。あと 1 組です。",
     break2: "少し目を休めていただいて構いません。準備ができましたら、下のボタンを押して続けてください。目盛りの使い方はこれまでと同じです。",
     breakContinue: "続ける",
     main2: "目盛りは先ほどとまったく同じです。左端は想像できるかぎり最も冷たい状態、右端は最も熱い状態を表します。それぞれの色を見て、その色から感じる温度がこの線のどのあたりに当たるかをお答えください。",
@@ -526,15 +581,16 @@ const I18N = {
     counter: "{i} / {n}",
     practice: "練習",
     doneTitle: "ご協力ありがとうございました",
-    sending: "回答を送信しています…",
-    sent: "回答が送信されました。このページを閉じて構いません。",
+    sending: "回答を送信しています。少々お待ちください…",
+    sent: "回答が正常に送信されました。ご参加ありがとうございました。",
     sentUnconfirmed: "回答を送信しました（受信の確認はできませんでした）。念のため下のボタンからデータを保存しておいてください。",
+    sentNoCode: "回答はすべて送信されました。被験者コードのみ取得できませんでしたが、データは記録されています。",
     failed: "送信に失敗しました。下のボタンからデータをダウンロードし、研究者にお送りください。",
     offline: "オンライン送信は設定されていません。下のボタンからデータをダウンロードし、研究者にお送りください。",
     codeLabel: "完了コード",
     subjectLabel: "被験者コード",
     preparing: "準備中…",
-    partial: "一部のデータの送信に失敗しました。下のボタンからデータをダウンロードし、研究者にお送りください。",
+    partial: "一部のデータの送信に失敗しました。スタッフにお知らせください。",
     done1: "",
     download: "データをダウンロード（CSV）",
     restart: "次の参加者を開始"
@@ -558,20 +614,21 @@ const I18N = {
     instrTitle: "How to respond",
     instr1: "A color will appear in the middle of the screen. Click (or tap) on the line below it to indicate the temperature impression you get from that color.",
     instr2: "The left end means as cold as you can imagine, and the right end as hot as you can imagine. You can choose any point on the line and drag to adjust after clicking.",
-    instr3: "There are no right or wrong answers. Go with your first impression. For practice, you will first place a few everyday sensations, and then one colour, on this line.",
+    instr3: "There are no right or wrong answers. Go with your first impression. For practice, you will touch the plate on the table three times \u2014 staff will change its temperature between touches \u2014 and rate each one on this line.",
     coldLong: "As cold as you can imagine",
     hotLong: "As hot as you can imagine",
     cold: "Very cold",
     hot: "Very hot",
-    probePrompt: "Imagine what your hand feels in this situation",
-    ref_cold: "The coolness of holding a cold drink",
-    ref_hot: "The warmth of holding a hot cup of coffee",
-    ref_neutral: "The temperature you feel when you touch your own other hand",
+    probePrompt: "Touch the plate briefly with your fingertips,\nthen rate how it feels",
+    refTouch: "Touch {i} of {n}",
+    restPrompt: "Please wait a moment for your hand to return to normal ({s} s)",
+    skinTempLabel: "Right index finger temperature (\u00B0C)",
+    skinTempHint: "Please fill in your right index finger temperature indicated by the white target label on the thermal camera",
     startPractice: "Start practice",
     mainTitle: "Main session",
-    main1: "Practice is complete. You will now rate {sets} sets of colors, {per} in each, {total} trials in total. There is a break between the two sets.",
+    main1: "Practice is complete. You will now rate {sets} sets of colors, {total} trials in total. There is a break between the two sets.",
     breakTitle: "Take a break",
-    break1: "That is the first set finished — you are halfway through.",
+    break1: "That is the first set finished — one more to go.",
     break2: "Feel free to rest your eyes for a moment. Press the button below when you are ready to continue. The scale works exactly as before.",
     breakContinue: "Continue",
     main2: "The scale is exactly the same as before. The left end means as cold as you can imagine, and the right end as hot as you can imagine. Look at each color and mark where the temperature it gives you falls on this line.",
@@ -580,15 +637,16 @@ const I18N = {
     counter: "{i} / {n}",
     practice: "Practice",
     doneTitle: "Thank you for taking part",
-    sending: "Sending your responses…",
-    sent: "Your responses were received. You may close this page.",
+    sending: "Sending your responses \u2014 please wait\u2026",
+    sent: "Your responses were sent successfully. Thank you for taking part.",
     sentUnconfirmed: "Your responses were sent, but receipt could not be confirmed. Please also save a copy with the button below.",
+    sentNoCode: "All responses were received. Only the subject code could not be obtained; the data itself is recorded.",
     failed: "Sending failed. Please download your data with the button below and send it to the researcher.",
     offline: "Online submission is not configured. Please download your data with the button below and send it to the researcher.",
     codeLabel: "Completion code",
     subjectLabel: "Subject code",
     preparing: "Preparing…",
-    partial: "Some responses could not be sent. Please download your data with the button below and send it to the researcher.",
+    partial: "Some responses could not be sent. Please let the researcher know.",
     done1: "",
     download: "Download data (CSV)",
     restart: "New participant"
@@ -612,20 +670,21 @@ const I18N = {
     instrTitle: "作答方式",
     instr1: "畫面中央會顯示一種顏色。請點擊（或輕觸）下方線段上的位置，表示這個顏色帶給您的溫度感受。",
     instr2: "最左端代表您能想像到最冷的程度，最右端代表最熱的程度。您可以選擇線段上任何一點，點選後也可拖曳調整。",
-    instr3: "沒有正確答案，請憑第一印象作答。開始之前，我們會先請您把幾種日常的溫度感覺、以及一個顏色，標示在這條線上，作為練習。",
+    instr3: "沒有正確答案，請憑第一印象作答。開始之前，我們會先請您輕觸桌上的金屬板 3 次（每次由工作人員調整溫度），並把每次感受到的溫度標示在這條線上，作為練習。",
     coldLong: "您能想像到最冷的程度",
     hotLong: "您能想像到最熱的程度",
     cold: "非常冷",
     hot: "非常熱",
-    probePrompt: "請想像在以下情況中，手所感受到的溫度",
-    ref_cold: "手拿冰飲料的冰涼感",
-    ref_hot: "手拿熱咖啡的溫熱感",
-    ref_neutral: "摸自己另外一隻手時的溫度感覺",
+    probePrompt: "請用指腹輕觸金屬板，\n並標示您感受到的溫度",
+    refTouch: "第 {i} 次觸摸（共 {n} 次）",
+    restPrompt: "請稍候，讓手的溫度恢復（{s} 秒）",
+    skinTempLabel: "右手食指溫度（\u00B0C）",
+    skinTempHint: "請填入熱像儀畫面上白色標記所顯示的右手食指溫度",
     startPractice: "開始練習",
     mainTitle: "正式作答",
-    main1: "練習結束。接下來會有 {sets} 組顏色，每組 {per} 種，共 {total} 題；兩組之間會有一次休息。",
+    main1: "練習結束。接下來會有 {sets} 組顏色，共 {total} 題；兩組之間會有一次休息。",
     breakTitle: "休息一下",
-    break1: "第一組結束了，您已經完成一半。",
+    break1: "第一組結束了，還剩下一組。",
     break2: "可以先讓眼睛休息一下，準備好之後再按下方按鈕繼續。量尺的使用方式和前面完全相同。",
     breakContinue: "繼續作答",
     main2: "量尺和剛才完全相同：最左端代表您能想像到最冷的程度，最右端代表最熱的程度。請看著每個顏色，感受它帶給您的溫度，並標示在這條線上對應的位置。",
@@ -634,15 +693,16 @@ const I18N = {
     counter: "{i} / {n}",
     practice: "練習",
     doneTitle: "感謝您的參與",
-    sending: "正在傳送您的回答…",
-    sent: "您的回答已成功送出，可以關閉此頁面。",
+    sending: "正在傳送您的回答，請稍候…",
+    sent: "您的回答已成功送出，感謝您的參與",
     sentUnconfirmed: "回答已送出，但無法確認是否收到。請同時使用下方按鈕儲存一份資料。",
+    sentNoCode: "您的回答已全部送出。僅未能取得受試者代碼，但資料已完整記錄。",
     failed: "傳送失敗。請使用下方按鈕下載資料，並寄給研究人員。",
     offline: "尚未設定線上傳送。請使用下方按鈕下載資料，並寄給研究人員。",
     codeLabel: "完成代碼",
     subjectLabel: "受試者代碼",
     preparing: "準備中…",
-    partial: "部分資料傳送失敗。請使用下方按鈕下載資料，並寄給研究人員。",
+    partial: "部分資料傳送失敗。請通知研究人員",
     done1: "",
     download: "下載資料（CSV）",
     restart: "下一位參與者"
@@ -662,6 +722,8 @@ const session = {
   age: "",
   gender: "",
   colorVision: "",
+  skinTemp: "",
+  sendErrors: [],    // short log of why uploads failed, for diagnosis      // baseline skin temperature in degC, entered by staff
   startedAt: new Date().toISOString(),
   device: null,
   rows: []
@@ -672,9 +734,14 @@ let trials = [];       // sequence of {color, practice, rep}
 let idx = 0;
 let cur = null;        // current trial timing/response
 let mainStarted = false;
+let referentOrder = [];
+let restTimer = null;
 let blockOrder = [];
-const pending = [];    // in-flight trial uploads
+const buffer = [];     // rows waiting to be uploaded
+const pending = [];    // in-flight flushes
 let sendFailures = 0;
+let registerPromise = null;
+let flushing = false;
 let trialTimer = null;
 
 function makeId() {
@@ -722,10 +789,10 @@ function show(id) {
 /* ---------- sequence ---------- */
 function buildSequence() {
   const seq = [];
-  CONFIG.REFERENTS.forEach(key => seq.push({ kind: "referent", key, practice: 1, rep: 0, block: 0, set: "" }));
-  if (CONFIG.PRACTICE_COLOR) {
-    seq.push({ kind: "color", color: CONFIG.PRACTICE_COLOR, practice: 1, rep: 0, block: 0, set: "practice" });
-  }
+  const refs = CONFIG.REFERENTS.slice();   // fixed order, set by the plate protocol
+  referentOrder = refs.map(r => r.key);
+  refs.forEach(r => seq.push({ kind: "referent", ref: r, key: r.key,
+                               practice: 1, rep: 0, block: 0, set: "" }));
   blockOrder = CONFIG.BLOCK_ORDER.slice();
   if (CONFIG.RANDOMIZE_BLOCK_ORDER) shuffle(blockOrder);
   blockOrder.forEach((setName, bi) => {
@@ -769,6 +836,18 @@ function deviceInfo() {
 
 /* ---------- VAS ---------- */
 const vas = $("vas"), marker = $("marker"), patch = $("patch");
+(function addTicks() {
+  const ticks = CONFIG.VAS_TICKS || [];
+  if (!ticks.length) return;
+  document.querySelectorAll(".vas").forEach(el => {
+    ticks.forEach(pct => {
+      const d = document.createElement("div");
+      d.className = "tick";
+      d.style.left = pct + "%";
+      el.insertBefore(d, el.querySelector(".marker") || null);
+    });
+  });
+})();
 let dragging = false;
 function setVas(clientX) {
   const rect = vas.getBoundingClientRect();
@@ -814,11 +893,17 @@ function renderProbeText() {
   const t = trials[idx];
   if (!t || t.kind !== "referent") return;
   $("probe-prompt").textContent = T.probePrompt;
-  $("probe-text").textContent = T[t.key];
+  $("probe-text").textContent = fmt(T.refTouch, { i: t.ref.step, n: CONFIG.REFERENTS.length });
 }
 function startTrial() {
   const t = trials[idx];
   const isColor = t.kind === "color";
+  const prev = idx > 0 ? trials[idx - 1] : null;
+  // Longer gap before a referent that follows another referent, so the skin can
+  // re-equilibrate before the next plate is touched.
+  const restMs = (t.kind === "referent" && prev && prev.kind === "referent")
+    ? (CONFIG.REFERENT_REST_S || 0) * 1000 : 0;
+  const waitMs = restMs || CONFIG.ISI_MS;
   updateCounterText();
   vas.classList.remove("answered");
   vas.removeAttribute("aria-valuenow");
@@ -830,7 +915,19 @@ function startTrial() {
   $("probe-text").textContent = "";
   cur = null;
   show("s-trial");
+  clearInterval(restTimer); restTimer = null;
+  if (restMs) {
+    $("probe").hidden = false;
+    let left = Math.round(restMs / 1000);
+    const tick = () => {
+      $("probe-prompt").textContent = "";
+      $("probe-text").textContent = fmt(T.restPrompt, { s: left });
+    };
+    tick();
+    restTimer = setInterval(() => { left--; if (left > 0) tick(); else clearInterval(restTimer); }, 1000);
+  }
   setTimeout(() => {
+    clearInterval(restTimer); restTimer = null;
     if (isColor) patch.style.background = hex(t.color.rgb);
     else renderProbeText();
     cur = { onset: performance.now(), vas: null, rtFirst: null, nClicks: 0, timedOut: 0 };
@@ -838,13 +935,13 @@ function startTrial() {
     if (CONFIG.TRIAL_TIMEOUT_MS > 0) {
       trialTimer = setTimeout(() => { if (cur) { cur.timedOut = 1; endTrial(); } }, CONFIG.TRIAL_TIMEOUT_MS);
     }
-  }, CONFIG.ISI_MS);
+  }, waitMs);
 }
 function renderMainIntroText() {
   const total = trials.filter(x => !x.practice).length;
   const sets = blockOrder.length || 1;
   $("s-main-intro").querySelector("[data-i18n='main1']").textContent =
-    fmt(T.main1, { sets: sets, per: Math.round(total / sets), total: total });
+    fmt(T.main1, { sets: sets, total: total });
 }
 function endTrial() {
   clearTimeout(trialTimer); trialTimer = null;
@@ -859,6 +956,7 @@ function endTrial() {
     age: session.age,
     gender: session.gender,
     color_vision_difficulty: session.colorVision,
+    skin_temp_c: session.skinTemp,
     lang,
     color_set: isColor ? t.set : "",
     block: isColor ? t.block : "",
@@ -868,12 +966,16 @@ function endTrial() {
     trial: idx + 1,
     rep: t.rep,
     color_name: isColor ? c.name : t.key,
+    ref_step: isColor ? "" : t.ref.step,
+    ref_temp_c: isColor ? "" : t.ref.temp_c,
+    referent_order: referentOrder.join("|"),
     cmy: isColor ? c.cmy : "",
     hue_deg: isColor && c.hue != null ? c.hue : "",
     L_star: isColor ? c.L : "", C_star: isColor ? c.C : "",
     r: isColor ? c.rgb[0] : "", g: isColor ? c.rgb[1] : "", b: isColor ? c.rgb[2] : "",
     hex: isColor ? hex(c.rgb) : "",
     vas: cur.vas == null ? "" : cur.vas,
+    vas_ticks: (CONFIG.VAS_TICKS || []).join("|"),
     timed_out: cur.timedOut,
     rt_first_ms: cur.rtFirst == null ? "" : cur.rtFirst,
     rt_submit_ms: Math.round(performance.now() - cur.onset),
@@ -887,36 +989,116 @@ function endTrial() {
   const next = trials[idx], done = trials[idx - 1];
   if (!next.practice && !mainStarted) {
     mainStarted = true;
+    flush();                 // participant is reading; a slow request is invisible
     renderMainIntroText();
     show("s-main-intro");
   } else if (!next.practice && !done.practice && next.kind === "color" &&
              done.kind === "color" && next.block !== done.block) {
+    flush();
     show("s-break");
   } else {
     startTrial();
   }
 }
 
-/* ---------- network ---------- */
-async function post(payload, timeoutMs = 10000) {
+/* ---------- network ----------
+   Timeouts are generous because only registration is ever waited on, and that
+   runs in the background while the participant reads. When a reply is slow the
+   page gives up and re-sends even though the write may have succeeded; the
+   Apps Script skips any row whose session_id + trial it already holds, and
+   returns the existing subject code for a repeated registration, so re-sending
+   is always safe. NEEDS the 2026-09 Code.gs - redeploy after updating it. */
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+async function post(payload, timeoutMs) {
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs || CONFIG.NET.TRIAL_MS);
   try {
     const res = await fetch(CONFIG.ENDPOINT_URL, {
       method: "POST", body: JSON.stringify(payload),
       headers: { "Content-Type": "text/plain;charset=utf-8" }, signal: ctrl.signal
     });
+    if (!res.ok) throw new Error("HTTP " + res.status);
     return await res.json();
   } finally { clearTimeout(timer); }
 }
+async function postRetry(payload, timeoutMs, attempts) {
+  const n = attempts || CONFIG.NET.ATTEMPTS;
+  let last = "";
+  for (let i = 0; i < n; i++) {
+    if (i) await sleep(i * 2000);
+    try {
+      const j = await post(payload, timeoutMs);
+      if (j && j.ok) return j;
+      last = (j && j.error) ? String(j.error) : "bad reply";
+    } catch (e) {
+      last = (e && e.name === "AbortError") ? "timeout" : String((e && e.message) || e);
+    }
+  }
+  noteError(payload.action + ":" + last);
+  return null;
+}
+// Repeated identical failures are collapsed to "reason x N" so the note stays short.
+function noteError(msg) {
+  const hit = session.sendErrors.find(e => e.msg === msg);
+  if (hit) hit.n++;
+  else if (session.sendErrors.length < 6) session.sendErrors.push({ msg, n: 1 });
+}
+function errorSummary() {
+  return session.sendErrors.map(e => e.n > 1 ? `${e.msg} \u00D7${e.n}` : e.msg).join(" / ");
+}
+// Wake the Apps Script instance early, so the first real POST is not a cold start.
+let warmed = false;
+function warmUp() {
+  if (warmed || !CONFIG.ENDPOINT_URL) return;
+  warmed = true;
+  fetch(CONFIG.ENDPOINT_URL, { method: "GET", cache: "no-store" }).catch(() => {});
+}
+function register() {
+  if (!CONFIG.ENDPOINT_URL) return Promise.resolve();
+  return postRetry({ action: "register", study_id: CONFIG.STUDY_ID, session_id: session.id,
+                     participant_id: session.pid, age: session.age, gender: session.gender,
+                     color_vision_difficulty: session.colorVision,
+                     skin_temp_c: session.skinTemp,
+                     block_order: blockOrder.join("|"),
+                     referent_order: referentOrder.join("|"),
+                     lang, device: session.device }, CONFIG.NET.REGISTER_MS)
+    .then(j => { if (j && j.subject_code) session.subject = j.subject_code; });
+}
+// Queue a finished trial. Nothing is sent until the buffer is full enough, or a
+// pause screen / the end of the session calls flush().
 function sendTrial(row) {
   if (!CONFIG.ENDPOINT_URL) return;
-  const cols = Object.keys(row);
-  const p = post({ action: "trial", columns: cols, row: cols.map(k => row[k]) })
-    .then(j => { if (!j || !j.ok) sendFailures++; })
-    .catch(() => { sendFailures++; });
-  pending.push(p);
+  buffer.push(row);
+  if (buffer.length >= (CONFIG.NET.FLUSH_EVERY || 6)) flush();
 }
+// Upload everything currently buffered as ONE request. On failure the rows are
+// put back and go out with the next flush, so a bad moment never multiplies into
+// extra requests. Only one flush is ever in flight.
+function flush(attempts) {
+  if (!CONFIG.ENDPOINT_URL || flushing || !buffer.length) return Promise.resolve(true);
+  flushing = true;
+  const rows = buffer.splice(0, buffer.length);
+  const cols = Object.keys(rows[0]);
+  const p = postRetry({ action: "batch", columns: cols, rows: rows.map(r => cols.map(k => r[k])) },
+                      CONFIG.NET.BATCH_MS, attempts || 1)
+    .then(j => {
+      if (!j) { buffer.unshift.apply(buffer, rows); return false; }
+      return true;
+    })
+    .catch(() => { buffer.unshift.apply(buffer, rows); return false; })
+    .finally(() => { flushing = false; });
+  pending.push(p);
+  return p;
+}
+// Keep the screen awake: a sleeping phone suspends in-flight uploads.
+let wakeLock = null;
+async function keepAwake() {
+  try { if (navigator.wakeLock) wakeLock = await navigator.wakeLock.request("screen"); }
+  catch (e) { /* not supported, or denied */ }
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && wakeLock === null) keepAwake();
+});
 
 /* ---------- finish + submit ---------- */
 function columns() { return Object.keys(session.rows[0] || {}); }
@@ -939,14 +1121,43 @@ async function finish() {
   $("subject").textContent = session.subject || "—";
   if (!CONFIG.ENDPOINT_URL) { setStatus("offline"); return; }
   setStatus("sending");
-  await Promise.all(pending);
-  let finished = false;
-  try {
-    const j = await post({ action: "finish", session_id: session.id, n_trials: session.rows.length });
-    finished = !!(j && j.ok);
-  } catch (e) { /* fall through */ }
-  if (sendFailures > 0 || !session.subject) setStatus("partial");
-  else setStatus(finished ? "sent" : "sentUnconfirmed");
+  // Wait for outstanding uploads, but never hang the final screen on one of them.
+  await Promise.race([Promise.all(pending), sleep(CONFIG.NET.DRAIN_MS)]);
+
+  const tail = (async () => {
+    // Everything still buffered goes up in one batch; this one is worth retrying.
+    while (flushing) await sleep(400);               // let any in-flight flush finish
+    if (buffer.length) await flush(2);
+    sendFailures = buffer.length;
+    return !!(await postRetry({ action: "finish", session_id: session.id,
+                                n_trials: session.rows.length,
+                                send_errors: errorSummary() },
+                              CONFIG.NET.FINISH_MS, 2));
+  })();
+
+  const applyStatus = (finished) => {
+    if (sendFailures > 0) setStatus("partial");
+    else if (!session.subject) setStatus("sentNoCode");
+    else setStatus(finished ? "sent" : "sentUnconfirmed");
+    showSendErrors();
+  };
+  // On a very bad connection the tail could take minutes; cap it, show the
+  // participant a result, and correct the message later if it does get through.
+  const r = await Promise.race([tail, sleep(CONFIG.NET.TAIL_MS).then(() => "cap")]);
+  if (r === "cap") { setStatus("partial"); showSendErrors(); tail.then(applyStatus); }
+  else applyStatus(r);
+  if (wakeLock) { try { wakeLock.release(); } catch (e) {} wakeLock = null; }
+}
+function showSendErrors() {
+  if (!session.sendErrors.length) return;
+  let d = $("send-errors");
+  if (!d) {
+    d = document.createElement("p");
+    d.id = "send-errors";
+    d.style.cssText = "font-family:var(--mono);font-size:11px;opacity:.55;margin-top:10px";
+    $("send-status").parentNode.appendChild(d);
+  }
+  d.textContent = errorSummary();
 }
 $("btn-csv").addEventListener("click", () => {
   const blob = new Blob(["\uFEFF" + toCsv()], { type: "text/csv;charset=utf-8" });
@@ -959,6 +1170,7 @@ $("btn-csv").addEventListener("click", () => {
 /* ---------- wiring ---------- */
 document.querySelectorAll(".lang button").forEach(b => b.addEventListener("click", () => {
   applyLang(b.dataset.lang);
+  warmUp();          // wake the Apps Script while the consent form is being read
   show("s-consent");
 }));
 
@@ -999,28 +1211,28 @@ $("btn-consent").addEventListener("click", () => {
   session.age = $("age").value.trim();
   session.gender = (document.querySelector('input[name="gender"]:checked') || {}).value || "";
   session.colorVision = (document.querySelector('input[name="colorvision"]:checked') || {}).value || "";
+  session.skinTemp = $("skin-temp").value.trim();
+  // Register now, in the background, while the participant reads the
+  // instructions. By the time they press "start practice" the code is normally
+  // already in hand, so nobody waits on a cold start.
+  session.device = deviceInfo();
+  trials = buildSequence();
+  idx = 0;
+  registerPromise = register();
+  keepAwake();
   show("s-instr");
 });
 $("btn-start").addEventListener("click", async () => {
   const btn = $("btn-start");
-  btn.disabled = true;
-  btn.textContent = T.preparing;
-  session.device = deviceInfo();
-  trials = buildSequence();
-  idx = 0;
-  if (CONFIG.ENDPOINT_URL) {
-    try {
-      const j = await post({ action: "register", study_id: CONFIG.STUDY_ID, session_id: session.id,
-                             participant_id: session.pid, age: session.age, gender: session.gender,
-                             color_vision_difficulty: session.colorVision,
-                             block_order: blockOrder.join("|"),
-                             lang, device: session.device });
-      if (j && j.ok && j.subject_code) session.subject = j.subject_code;
-    } catch (e) { /* no code: page continues, data still downloadable */ }
-    if (!session.subject) sendFailures++;
+  if (registerPromise && !session.subject) {
+    btn.disabled = true;
+    btn.textContent = T.preparing;
+    // Registration is usually finished already; if not, give it a little longer
+    // and then start anyway. session_id still links every row.
+    await Promise.race([registerPromise, sleep(CONFIG.NET.START_WAIT_MS)]);
+    btn.disabled = false;
+    btn.textContent = T.startPractice;
   }
-  btn.disabled = false;
-  btn.textContent = T.startPractice;
   startTrial();
 });
 $("btn-main").addEventListener("click", startTrial);
