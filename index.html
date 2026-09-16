@@ -455,14 +455,14 @@ const CONFIG = {
   // participants judge the sensation rather than doing arithmetic on the scale.
   // Keep `label` identical to the physical marking on each plate.
   // One Peltier hot/cold plate, re-set by staff between touches. FIXED order
-  // 30 -> 15 -> 45: the 30 degC reading is taken with the hand at rest (it is the
-  // point closest to skin temperature and so the most vulnerable to adaptation),
-  // and the sequence ends warm, because cold after-effects outlast warm ones.
-  // 30 is also the exact midpoint of 15 and 45, which makes its rating a free
-  // test of whether the VAS is linear in degrees.
+  // 15 -> 30 -> 45: a single upward sweep, so the plate never has to reverse
+  // direction and each step is the same size. 30 is the exact midpoint of 15 and
+  // 45, which makes its rating a free test of whether the VAS is linear in
+  // degrees; note that it is now judged by a hand that has just touched 15 degC,
+  // so expect it to read a little warm.
   REFERENTS: [
-    { key: "ref_mid",  step: 1, temp_c: 30 },
-    { key: "ref_cold", step: 2, temp_c: 15 },
+    { key: "ref_cold", step: 1, temp_c: 15 },
+    { key: "ref_mid",  step: 2, temp_c: 30 },
     { key: "ref_hot",  step: 3, temp_c: 45 }
   ],
   // Touches are brief, so no enforced recovery interval. Set >0 to reinstate it.
@@ -558,12 +558,12 @@ const I18N = {
     instrTitle: "回答のしかた",
     instr1: "画面の中央に色が表示されます。その色から感じる温度の印象を、下の線の上をクリック（タップ）して答えてください。",
     instr2: "左端は想像できるかぎり最も冷たい状態、右端は最も熱い状態を表します。線上のどこでも自由に選べ、選んだ後にドラッグして調整できます。",
-    instr3: "正解はありません。あまり考え込まず、直感でお答えください。まず練習として、机の上のプレートに 3 回（毎回スタッフが温度を変えます）軽く触れ、感じた温度をこの線の上でお答えいただきます。",
+    instr3: "正解はありません。あまり考え込まず、直感でお答えください。まず練習として、右手の人差し指で机の上の金属プレートに 3 回（毎回スタッフが温度を変えます）軽く触れ、感じた温度をこの線の上でお答えいただきます。",
     coldLong: "想像できるかぎり最も冷たい",
     hotLong: "想像できるかぎり最も熱い",
     cold: "とても冷たい",
     hot: "とても熱い",
-    probePrompt: "プレートに指先で軽く触れ、\n感じた温度をお答えください",
+    probePrompt: "右手の人差し指の腹で金属面に軽く触れ、\n感じた温度をお答えください",
     refTouch: "{i} 回目の接触（全 {n} 回）",
     restPrompt: "手の温度が戻るまで少しお待ちください（{s} 秒）",
     skinTempLabel: "右手の人差し指の温度（\u00B0C）",
@@ -614,12 +614,12 @@ const I18N = {
     instrTitle: "How to respond",
     instr1: "A color will appear in the middle of the screen. Click (or tap) on the line below it to indicate the temperature impression you get from that color.",
     instr2: "The left end means as cold as you can imagine, and the right end as hot as you can imagine. You can choose any point on the line and drag to adjust after clicking.",
-    instr3: "There are no right or wrong answers. Go with your first impression. For practice, you will touch the plate on the table three times \u2014 staff will change its temperature between touches \u2014 and rate each one on this line.",
+    instr3: "There are no right or wrong answers. Go with your first impression. For practice, please use your right index finger to touch the metal plate on the table three times \u2014 staff will change its temperature between touches \u2014 and rate each one on this line.",
     coldLong: "As cold as you can imagine",
     hotLong: "As hot as you can imagine",
     cold: "Very cold",
     hot: "Very hot",
-    probePrompt: "Touch the plate briefly with your fingertips,\nthen rate how it feels",
+    probePrompt: "Please use your right index finger pad to touch the metal surface,\nthen rate how it feels",
     refTouch: "Touch {i} of {n}",
     restPrompt: "Please wait a moment for your hand to return to normal ({s} s)",
     skinTempLabel: "Right index finger temperature (\u00B0C)",
@@ -670,12 +670,12 @@ const I18N = {
     instrTitle: "作答方式",
     instr1: "畫面中央會顯示一種顏色。請點擊（或輕觸）下方線段上的位置，表示這個顏色帶給您的溫度感受。",
     instr2: "最左端代表您能想像到最冷的程度，最右端代表最熱的程度。您可以選擇線段上任何一點，點選後也可拖曳調整。",
-    instr3: "沒有正確答案，請憑第一印象作答。開始之前，我們會先請您輕觸桌上的金屬板 3 次（每次由工作人員調整溫度），並把每次感受到的溫度標示在這條線上，作為練習。",
+    instr3: "沒有正確答案，請憑第一印象作答。開始之前，我們會先請您用右手食指輕觸桌上的金屬板 3 次（每次由工作人員調整溫度），並把每次感受到的溫度標示在這條線上，作為練習。",
     coldLong: "您能想像到最冷的程度",
     hotLong: "您能想像到最熱的程度",
     cold: "非常冷",
     hot: "非常熱",
-    probePrompt: "請用指腹輕觸金屬板，\n並標示您感受到的溫度",
+    probePrompt: "請用右手食指指腹輕觸金屬板表面，\n並標示您感受到的溫度",
     refTouch: "第 {i} 次觸摸（共 {n} 次）",
     restPrompt: "請稍候，讓手的溫度恢復（{s} 秒）",
     skinTempLabel: "右手食指溫度（\u00B0C）",
@@ -1213,13 +1213,15 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
+// Age and skin temperature are both optional - a visitor who would rather not
+// say, or whom the thermal camera could not read, still gives usable ratings.
 function updateConsentGate() {
-  const ageOk = $("age").value.trim() !== "";
   const genderOk = !!document.querySelector('input[name="gender"]:checked');
-  $("btn-consent").disabled = !($("consent").checked && ageOk && genderOk);
+  $("btn-consent").disabled = !($("consent").checked && genderOk);
 }
 $("consent").addEventListener("change", updateConsentGate);
 $("age").addEventListener("input", updateConsentGate);
+$("skin-temp").addEventListener("input", updateConsentGate);
 document.querySelectorAll('input[name="gender"]').forEach(r => r.addEventListener("change", updateConsentGate));
 $("btn-consent").addEventListener("click", () => {
   session.age = $("age").value.trim();
