@@ -480,8 +480,8 @@ const CONFIG = {
     FINISH_MS: 20000,
     ATTEMPTS: 3,           // registration only
     START_WAIT_MS: 6000,   // extra wait at "start practice" if registration is slow
-    DRAIN_MS: 15000,       // cap on waiting for an in-flight flush at the end
-    TAIL_MS: 30000         // hard cap on the whole end-of-session send
+    DRAIN_MS: 8000,        // cap on waiting for an in-flight flush at the end
+    TAIL_MS: 20000         // hard cap on the whole end-of-session send
   },
   // No practice colour: the three plate ratings already teach the scale.
   // Both sets run in one session as two blocks. The order is randomised per
@@ -1074,8 +1074,12 @@ function sendTrial(row) {
 // Upload everything currently buffered as ONE request. On failure the rows are
 // put back and go out with the next flush, so a bad moment never multiplies into
 // extra requests. Only one flush is ever in flight.
-function flush(attempts) {
-  if (!CONFIG.ENDPOINT_URL || flushing || !buffer.length) return Promise.resolve(true);
+// force=true skips the one-at-a-time guard. Used only for the final flush: the
+// rows are disjoint from whatever is already in flight, and the Apps Script
+// ignores anything it already holds, so overlapping writes are harmless and
+// this saves waiting out an in-flight request at the end.
+function flush(attempts, force) {
+  if (!CONFIG.ENDPOINT_URL || (flushing && !force) || !buffer.length) return Promise.resolve(true);
   flushing = true;
   const rows = buffer.splice(0, buffer.length);
   const cols = Object.keys(rows[0]);
@@ -1115,24 +1119,30 @@ function setStatus(key) {
   lastStatusKey = key;
   $("send-status").textContent = T[key];
 }
+// The thank-you screen appears at once; uploading continues behind it. The
+// participant never waits on the network. "Next participant" stays disabled
+// until the upload settles, because restarting would discard anything unsent.
 async function finish() {
   show("s-done");
   $("code").textContent = session.subject ? `${session.subject}-${session.id}` : session.id;
   $("subject").textContent = session.subject || "—";
   if (!CONFIG.ENDPOINT_URL) { setStatus("offline"); return; }
   setStatus("sending");
-  // Wait for outstanding uploads, but never hang the final screen on one of them.
-  await Promise.race([Promise.all(pending), sleep(CONFIG.NET.DRAIN_MS)]);
+  $("btn-restart").disabled = true;
 
   const tail = (async () => {
-    // Everything still buffered goes up in one batch; this one is worth retrying.
-    while (flushing) await sleep(400);               // let any in-flight flush finish
-    if (buffer.length) await flush(2);
+    // The finish record touches a different tab and depends on nothing here, so
+    // it goes out straight away rather than queueing behind the last batch.
+    const finishCall = postRetry({ action: "finish", session_id: session.id,
+                                   n_trials: session.rows.length,
+                                   send_errors: errorSummary() },
+                                 CONFIG.NET.FINISH_MS, 2);
+    const lastBatch = buffer.length ? flush(2, true) : Promise.resolve(true);
+    const [, , fin] = await Promise.all([
+      Promise.race([Promise.all(pending), sleep(CONFIG.NET.DRAIN_MS)]),
+      lastBatch, finishCall]);
     sendFailures = buffer.length;
-    return !!(await postRetry({ action: "finish", session_id: session.id,
-                                n_trials: session.rows.length,
-                                send_errors: errorSummary() },
-                              CONFIG.NET.FINISH_MS, 2));
+    return !!fin;
   })();
 
   const applyStatus = (finished) => {
@@ -1140,13 +1150,17 @@ async function finish() {
     else if (!session.subject) setStatus("sentNoCode");
     else setStatus(finished ? "sent" : "sentUnconfirmed");
     showSendErrors();
+    $("btn-restart").disabled = false;
+    if (wakeLock) { try { wakeLock.release(); } catch (e) {} wakeLock = null; }
   };
-  // On a very bad connection the tail could take minutes; cap it, show the
-  // participant a result, and correct the message later if it does get through.
+  // On a very bad connection the tail could take minutes; cap it, show a
+  // result, and correct the message later if it does get through.
   const r = await Promise.race([tail, sleep(CONFIG.NET.TAIL_MS).then(() => "cap")]);
-  if (r === "cap") { setStatus("partial"); showSendErrors(); tail.then(applyStatus); }
-  else applyStatus(r);
-  if (wakeLock) { try { wakeLock.release(); } catch (e) {} wakeLock = null; }
+  if (r === "cap") {
+    setStatus("partial"); showSendErrors();
+    $("btn-restart").disabled = false;
+    tail.then(applyStatus);
+  } else applyStatus(r);
 }
 function showSendErrors() {
   if (!session.sendErrors.length) return;
