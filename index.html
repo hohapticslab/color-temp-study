@@ -470,15 +470,21 @@ const CONFIG = {
   // --- network ---
   // Several tablets share ONE Apps Script lock, so what matters is the number of
   // requests, not their size. Trials are therefore buffered and uploaded in
-  // batches: ~8 requests per participant instead of 30. Failed flushes are never
-  // retried in-session - the rows simply stay in the buffer and go out with the
-  // next flush, which is self-healing and cannot pile up.
+  // batches: ~8 requests per participant instead of 30. A failed flush is retried
+  // a bounded number of times (BATCH_ATTEMPTS); if it still fails the rows go back
+  // into the buffer and leave with the next flush, so a bad moment costs at most a
+  // couple of extra requests and can never pile up. Retrying is safe ONLY because
+  // the Apps Script ignores a row whose session_id + trial it already holds -
+  // without that server-side check this would duplicate data.
   NET: {
     FLUSH_EVERY: 6,        // upload once this many rows are waiting (1 = per trial)
     REGISTER_MS: 30000,    // background; the participant is reading meanwhile
     BATCH_MS: 30000,       // background; nobody waits on these
     FINISH_MS: 20000,
     ATTEMPTS: 3,           // registration only
+    BATCH_ATTEMPTS: 3,     // mid-session batch: 1 try + 2 retries, 2 s then 4 s apart
+    FINISH_ATTEMPTS: 2,    // final batch: kept low so it still fits inside TAIL_MS
+    KEEPWARM_MS: 60000,    // ping the script this often so it does not go cold
     START_WAIT_MS: 6000,   // extra wait at "start practice" if registration is slow
     DRAIN_MS: 8000,        // cap on waiting for an in-flight flush at the end
     TAIL_MS: 20000         // hard cap on the whole end-of-session send
@@ -1048,10 +1054,28 @@ function errorSummary() {
 }
 // Wake the Apps Script instance early, so the first real POST is not a cold start.
 let warmed = false;
+function ping() {
+  fetch(CONFIG.ENDPOINT_URL, { method: "GET", cache: "no-store" }).catch(() => {});
+}
 function warmUp() {
   if (warmed || !CONFIG.ENDPOINT_URL) return;
   warmed = true;
-  fetch(CONFIG.ENDPOINT_URL, { method: "GET", cache: "no-store" }).catch(() => {});
+  ping();
+}
+// Keep-warm. A session contains long idle stretches - the plate has to be reset
+// between the three touches - and an Apps Script instance left alone goes cold,
+// so the next write takes seconds instead of milliseconds and the queued tablets
+// time out. A GET every minute keeps it awake. It only reads a constant and never
+// touches the spreadsheet or the lock, so it cannot collide with a real upload.
+let warmTimer = null;
+function startKeepWarm() {
+  if (warmTimer || !CONFIG.ENDPOINT_URL) return;
+  warmTimer = setInterval(() => {
+    if (document.visibilityState === "visible") ping();
+  }, CONFIG.NET.KEEPWARM_MS || 60000);
+}
+function stopKeepWarm() {
+  if (warmTimer) { clearInterval(warmTimer); warmTimer = null; }
 }
 function register() {
   if (!CONFIG.ENDPOINT_URL) return Promise.resolve();
@@ -1071,9 +1095,11 @@ function sendTrial(row) {
   buffer.push(row);
   if (buffer.length >= (CONFIG.NET.FLUSH_EVERY || 6)) flush();
 }
-// Upload everything currently buffered as ONE request. On failure the rows are
-// put back and go out with the next flush, so a bad moment never multiplies into
-// extra requests. Only one flush is ever in flight.
+// Upload everything currently buffered as ONE request, retrying a bounded number
+// of times. If every attempt fails the rows are put back and go out with the next
+// flush, so a bad moment never multiplies without limit. Only one flush is ever in
+// flight, so while a flush is retrying new rows simply accumulate in the buffer
+// and leave together afterwards.
 // force=true skips the one-at-a-time guard. Used only for the final flush: the
 // rows are disjoint from whatever is already in flight, and the Apps Script
 // ignores anything it already holds, so overlapping writes are harmless and
@@ -1084,7 +1110,7 @@ function flush(attempts, force) {
   const rows = buffer.splice(0, buffer.length);
   const cols = Object.keys(rows[0]);
   const p = postRetry({ action: "batch", columns: cols, rows: rows.map(r => cols.map(k => r[k])) },
-                      CONFIG.NET.BATCH_MS, attempts || 1)
+                      CONFIG.NET.BATCH_MS, attempts || CONFIG.NET.BATCH_ATTEMPTS || 1)
     .then(j => {
       if (!j) { buffer.unshift.apply(buffer, rows); return false; }
       return true;
@@ -1137,7 +1163,8 @@ async function finish() {
                                    n_trials: session.rows.length,
                                    send_errors: errorSummary() },
                                  CONFIG.NET.FINISH_MS, 2);
-    const lastBatch = buffer.length ? flush(2, true) : Promise.resolve(true);
+      const lastBatch = buffer.length
+      ? flush(CONFIG.NET.FINISH_ATTEMPTS || 2, true) : Promise.resolve(true);
     const [, , fin] = await Promise.all([
       Promise.race([Promise.all(pending), sleep(CONFIG.NET.DRAIN_MS)]),
       lastBatch, finishCall]);
@@ -1151,6 +1178,7 @@ async function finish() {
     else setStatus(finished ? "sent" : "sentUnconfirmed");
     showSendErrors();
     $("btn-restart").disabled = false;
+    stopKeepWarm();   // the session is over; nothing left to keep the script warm for
     if (wakeLock) { try { wakeLock.release(); } catch (e) {} wakeLock = null; }
   };
   // On a very bad connection the tail could take minutes; cap it, show a
@@ -1236,6 +1264,7 @@ $("btn-consent").addEventListener("click", () => {
   idx = 0;
   registerPromise = register();
   keepAwake();
+  startKeepWarm();
   show("s-instr");
 });
 $("btn-start").addEventListener("click", async () => {
